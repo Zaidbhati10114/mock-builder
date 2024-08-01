@@ -19,17 +19,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { usePathname } from "next/navigation";
-import { UserButton, useUser } from "@clerk/clerk-react";
+import { redirect, usePathname } from "next/navigation";
+import { RedirectToSignIn, useUser } from "@clerk/clerk-react";
 import { primaryNavItems } from "@/lib";
 import { Loader } from "./Loader";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import ProgressBar from "./ProgressBar";
 import JsonProgressBar from "./JsonProgressBar";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 
 export default function Sidebar() {
   const user = useUser();
+  if (!user) redirect("/sign-in");
   const user_info = user?.user;
   const getUser = useQuery(api.users.getUserById, { clerkId: user_info?.id! });
   const [navItems, setNavItems] = useState([...primaryNavItems]);
@@ -49,7 +51,12 @@ export default function Sidebar() {
     <div className="hidden h-screen border-r bg-muted/40 md:block">
       <div className="flex h-full flex-col">
         <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-          <UserButton />
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
+          <SignedOut>
+            <RedirectToSignIn />
+          </SignedOut>
           {!UserButton && <Loader />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
