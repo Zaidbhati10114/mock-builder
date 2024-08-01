@@ -39,7 +39,7 @@ export const updateUser = internalMutation({
 });
 
 export const getUserById = query({
-    args: { clerkId: v.string() },
+    args: { clerkId: v.optional(v.string()) },
     handler: async (ctx, args) => {
         const user = await ctx.db
             .query("users")

@@ -13,9 +13,15 @@ import Breadcrumbs from "./Breadcrumbs";
 import { useBreadcrumbStore } from "@/lib/store";
 import { useUser } from "@clerk/clerk-react";
 import { useRouter } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 const Projects = () => {
   const { user } = useUser();
+  const router = useRouter();
+  if (!user) {
+    revalidatePath("/dashboard/projects");
+    router.push("/sign-in");
+  }
   //const { updateBreadcrumbs } = useBreadcrumbStore();
 
   const documents = [
