@@ -1,7 +1,6 @@
 "use client";
-import { Button } from "@/components/ui/button";
-import { PlusIcon } from "lucide-react";
-import React, { useEffect } from "react";
+
+import React from "react";
 import ProjectCard from "./ProjectCard";
 import { AddProject } from "./AddProjectModal";
 import { useQuery } from "convex/react";
@@ -9,20 +8,17 @@ import { api } from "@/convex/_generated/api";
 import { convertCreatedAt } from "@/lib/utils";
 import { Loader } from "./Loader";
 import Image from "next/image";
-import Breadcrumbs from "./Breadcrumbs";
-import { useBreadcrumbStore } from "@/lib/store";
+
 import { useUser } from "@clerk/clerk-react";
 import { useRouter } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { projectType } from "@/types";
 
 const Projects = () => {
   const { user } = useUser();
   const router = useRouter();
   if (!user) {
-    revalidatePath("/dashboard/projects");
     router.push("/sign-in");
   }
-  //const { updateBreadcrumbs } = useBreadcrumbStore();
 
   const documents = [
     {
@@ -53,7 +49,11 @@ const Projects = () => {
             </div>
             <ul className="flex w-full flex-col gap-6 max-w-[730px]">
               {projects.map(
-                ({ _id: id, projectName, _creationTime: createdAt }: any) => (
+                ({
+                  _id: id,
+                  projectName,
+                  _creationTime: createdAt,
+                }: projectType) => (
                   <ProjectCard
                     key={id}
                     id={id}

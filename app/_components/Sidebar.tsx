@@ -1,39 +1,22 @@
 "use client";
 import Link from "next/link";
-import { EllipsisVertical } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { FileJson } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { redirect, usePathname } from "next/navigation";
-import { RedirectToSignIn, useUser } from "@clerk/clerk-react";
+import { useUser } from "@clerk/clerk-react";
 import { primaryNavItems } from "@/lib";
-import { Loader } from "./Loader";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+
 import ProgressBar from "./ProgressBar";
 import JsonProgressBar from "./JsonProgressBar";
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { Badge } from "@/components/ui/badge";
+import { useIsSubscribed } from "@/lib/useUserLimitstore";
 
 export default function Sidebar() {
+  const { user: userdetails, MAX_PROJECTS } = useIsSubscribed();
+  //console.log(isPro);
   const user = useUser();
   if (!user) redirect("/sign-in");
-  const user_info = user?.user;
-  const getUser = useQuery(api.users.getUserById, { clerkId: user_info?.id! });
   const [navItems, setNavItems] = useState([...primaryNavItems]);
   const pathname = usePathname();
 
@@ -44,40 +27,29 @@ export default function Sidebar() {
     return pathname.startsWith(link);
   };
 
-  const shouldShowUpgradeCard =
-    getUser?.jsonGenerationCount! > 1000 && getUser?.projectCount === 2;
-
   return (
     <div className="hidden h-screen border-r bg-muted/40 md:block">
       <div className="flex h-full flex-col">
         <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-          <SignedIn>
-            <UserButton />
-          </SignedIn>
-          <SignedOut>
-            <RedirectToSignIn />
-          </SignedOut>
-          {!UserButton && <Loader />}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="ml-auto h-8 w-8">
-                <EllipsisVertical className="h-4 w-4" />
-                <span className="sr-only">Toggle notifications</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center">
-              <DropdownMenuLabel className="cursor-pointer">
-                My Account
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer">
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
-                Support
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Link href="/" className="flex items-center gap-2 font-semibold">
+            <FileJson className="h-6 w-6" />
+            <span className="">Mock Builder</span>
+          </Link>
+
+          {/* {!(<UserButton />) && <Loader />} */}
+          {userdetails?.isPro ? (
+            <div className="rounded-full">
+              <Badge className="mt-5 ml-1" variant={"outline"}>
+                Pro
+              </Badge>
+            </div>
+          ) : (
+            <div className="rounded-full">
+              <Badge className="mt-5 ml-1" variant={"outline"}>
+                Free
+              </Badge>
+            </div>
+          )}
         </div>
         <nav className="flex-1 overflow-y-auto px-1 text-sm font-medium lg:px-4">
           {navItems.map(({ name, icon, link }, idx) => (
@@ -110,33 +82,12 @@ export default function Sidebar() {
             </div>
           ))}
         </nav>
-        {shouldShowUpgradeCard ? (
-          <div className="p-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Upgrade to Pro</CardTitle>
-                <CardDescription>
-                  Unlock all features and get unlimited access to our support
-                  team.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button size="sm" className="w-full">
-                  Upgrade
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          <>
-            <div className="p-4">
-              <ProgressBar />
-            </div>
-            <div className="p-4">
-              <JsonProgressBar />
-            </div>
-          </>
-        )}
+        <div className="p-4">
+          <ProgressBar max_projects={MAX_PROJECTS || 2} />
+        </div>
+        <div className="p-4">
+          <JsonProgressBar />
+        </div>
       </div>
     </div>
   );

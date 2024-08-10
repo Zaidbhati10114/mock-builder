@@ -11,8 +11,8 @@ const JsonProgressBar = () => {
   const get_user = useQuery(api.users.getUserById, { clerkId: user_id! });
 
   // Assuming the maximum number of projects is 2
-  const maxProjects = 1000;
-  const json_count = get_user?.jsonGenerationCount || 0;
+  const maxProjects = get_user?.jsonGenerationCount || 2;
+  const json_count = get_user?.jsonGenerationCount || 1000;
 
   // Calculate the progress value as a percentage
   const progressValue = (json_count / maxProjects) * 100;

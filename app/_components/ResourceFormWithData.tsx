@@ -1,15 +1,5 @@
 "use client";
-import {
-  Bird,
-  Copy,
-  CornerDownLeft,
-  Loader2,
-  Mic,
-  Paperclip,
-  Rabbit,
-  Save,
-  Turtle,
-} from "lucide-react";
+import { Bird, Copy, Loader2, Rabbit, Save } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 
 import { z } from "zod";
 import { Controller, useForm } from "react-hook-form";
@@ -34,6 +23,7 @@ import { optionsData } from "@/utils/optionsData";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useUser } from "@clerk/clerk-react";
+import { ConvexError } from "convex/values";
 
 const formSchema = z.object({
   model: z.string().min(1, "Model is required"),
@@ -93,7 +83,9 @@ export default function Component({ id }: FormProps) {
         "Resource saved successfully please wait for the data to be indexed"
       );
     } catch (error) {
-      toast.error("Resource saved failed Try again after some time");
+      const errorMessage =
+        error instanceof ConvexError ? (error.data as string) : "";
+      toast.error(errorMessage);
       console.error("Failed to save resource:", error);
     } finally {
       setIsSaving(false);
@@ -222,8 +214,8 @@ export default function Component({ id }: FormProps) {
   };
 
   return (
-    <main className="flex flex-col h-full gap-4 md:overflow-hidden p-4 md:flex-row">
-      <div className="w-full md:w-1/2 lg:w-1/3">
+    <div className="flex flex-col md:flex-row space-y-8 md:space-y-0 md:space-x-6">
+      <div className="w-full md:w-1/2 p-3 py-4">
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="grid w-full items-start gap-6"
@@ -288,37 +280,38 @@ export default function Component({ id }: FormProps) {
               {errors.model && (
                 <p className="text-red-500">{errors.model.message}</p>
               )}
-
-              <Label htmlFor="resources">Resources</Label>
-              <Controller
-                name="resources"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      handleOptionSelect(value);
-                    }}
-                  >
-                    <SelectTrigger
-                      id="resources"
-                      className="items-start [&_[data-description]]:hidden"
+              <div className="grid gap-3">
+                <Label htmlFor="resources">Resources</Label>
+                <Controller
+                  name="resources"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        handleOptionSelect(value);
+                      }}
                     >
-                      <SelectValue placeholder="Select resources" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(optionsData).map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      <SelectTrigger
+                        id="resources"
+                        className="items-start [&_[data-description]]:hidden"
+                      >
+                        <SelectValue placeholder="Select resources" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.keys(optionsData).map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.resources && (
+                  <p className="text-red-500">{errors.resources.message}</p>
                 )}
-              />
-              {errors.resources && (
-                <p className="text-red-500">{errors.resources.message}</p>
-              )}
+              </div>
             </div>
             <div className="grid gap-3">
               <Label htmlFor="resource-name">Resource Name</Label>
@@ -337,28 +330,27 @@ export default function Component({ id }: FormProps) {
                 <p className="text-red-500">{errors.resourceName.message}</p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-3">
-                <Label htmlFor="objects-count">Objects Count</Label>
-                <Controller
-                  name="objectsCount"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      id="objects-count"
-                      placeholder="Objects Count"
-                      type="number"
-                      {...field}
-                      onChange={(e) =>
-                        field.onChange(parseInt(e.target.value, 10))
-                      }
-                    />
-                  )}
-                />
-                {errors.objectsCount && (
-                  <p className="text-red-500">{errors.objectsCount.message}</p>
+
+            <div className="grid gap-3">
+              <Label htmlFor="objects-count">Objects Count</Label>
+              <Controller
+                name="objectsCount"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="objects-count"
+                    placeholder="Objects Count"
+                    type="number"
+                    {...field}
+                    onChange={(e) =>
+                      field.onChange(parseInt(e.target.value, 10))
+                    }
+                  />
                 )}
-              </div>
+              />
+              {errors.objectsCount && (
+                <p className="text-red-500">{errors.objectsCount.message}</p>
+              )}
             </div>
           </fieldset>
           <fieldset className="grid gap-6 rounded-lg border p-4">
@@ -392,46 +384,54 @@ export default function Component({ id }: FormProps) {
               )}
             </div>
           </fieldset>
-          <Button disabled={isLoading} type="submit">
-            Submit
-          </Button>
-          <Button
-            disabled={isLoading}
-            type="button"
-            variant="outline"
-            onClick={handleReset}
-          >
-            Reset
-          </Button>
-          {generatedData.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={handleSave}
-              disabled={isLoading || isSaving}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {isSaving ? "Saving..." : "Save"}
+          <div className="flex gap-2">
+            <Button disabled={isLoading} type="submit">
+              Submit
             </Button>
-          )}
+            <Button
+              disabled={isLoading}
+              type="button"
+              variant="outline"
+              onClick={handleReset}
+            >
+              Reset
+            </Button>
+            {generatedData.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleSave}
+                disabled={isLoading || isSaving}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {isSaving ? "Saving..." : "Save"}
+              </Button>
+            )}
+          </div>
         </form>
       </div>
-      <div className="flex-grow flex flex-col mt-4 md:mt-0 md:h-[calc(100vh-2rem)] rounded-xl bg-muted/50 p-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center flex-grow">
-            <Loader2 className="h-9 w-9 animate-spin" />
-          </div>
-        ) : (
-          <div className="flex flex-col h-full">
-            <Button
-              variant="outline"
-              className="self-end mb-2"
-              onClick={handleCopy}
-              disabled={isLoading || isCopying || generatedData.length === 0}
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              {isCopying ? "Copying..." : "Copy"}
-            </Button>
-            <div className="flex-grow overflow-y-auto">
+      <div className="w-full md:w-1/2 relative">
+        <Label
+          htmlFor="jsonOutput"
+          className="block text-sm mb-1 font-medium text-gray-700"
+        >
+          Generated JSON
+        </Label>
+        <div className="relative bg-muted/50 rounded-xl">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-[calc(100vh-300px)]">
+              <Loader2 className="h-9 w-9 animate-spin" />
+            </div>
+          ) : (
+            <div className="h-[calc(100vh-300px)] bg-muted/50 rounded-xl overflow-y-auto">
+              <Button
+                variant="outline"
+                className="absolute top-0 right-0 mr-2 mb-2 mt-2"
+                onClick={handleCopy}
+                disabled={isLoading || isCopying || generatedData.length === 0}
+              >
+                <Copy className="h-4 w-4" />
+                {isCopying ? "Copying..." : null}
+              </Button>
               <ul className="list-disc ml-5 mt-2">
                 {generatedData.map((data, index) => (
                   <li key={index} className="mt-1 text-sm leading-6">
@@ -442,9 +442,9 @@ export default function Component({ id }: FormProps) {
                 ))}
               </ul>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

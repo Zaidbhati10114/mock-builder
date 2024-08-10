@@ -23,8 +23,6 @@ export const createProject = mutation({
                 throw new ConvexError("You have reached the maximum number of projects");
             }
 
-
-
             const projects = await ctx.db.insert("projects", {
                 projectName: args.projectName,
                 userId: user[0]._id,
@@ -39,7 +37,7 @@ export const createProject = mutation({
 
         } catch (error) {
             console.error('Error occurred during project creation:', error);
-            throw error; // Propagate the error back
+            throw new ConvexError("Error occurred during project creation");
         }
     },
 });
@@ -134,4 +132,47 @@ export const deleteProject = mutation({
         return { success: true };
     }
 });
+
+
+
+export const deleteAllProjectsForUser = mutation({
+    args: { clerkId: v.string() },
+    handler: async (ctx, args) => {
+        const { clerkId } = args;
+
+        // Find the user
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
+            .first();
+
+        if (!user) {
+            throw new ConvexError("User not found");
+        }
+
+        // Get all projects for the user
+        const projects = await ctx.db
+            .query("projects")
+            .filter((q) => q.eq(q.field("userId"), user._id))
+            .collect();
+
+        for (const project of projects) {
+            // Delete all resources associated with each project
+            const resources = await ctx.db
+                .query("resources")
+                .filter((q) => q.eq(q.field("projectId"), project._id))
+                .collect();
+
+            for (const resource of resources) {
+                await ctx.db.delete(resource._id);
+            }
+
+            // Delete the project
+            await ctx.db.delete(project._id);
+        }
+
+        return { success: true };
+    },
+});
+
 

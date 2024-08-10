@@ -67,7 +67,9 @@ export const ResourceDataCard = ({
         setLive(false);
         toast.success("Resource is now private");
       } catch (error) {
-        toast.error("Error making resource private");
+        const errorMessage =
+          error instanceof ConvexError ? (error.data as string) : "";
+        toast.error(errorMessage);
       }
     } else {
       setShowConfirmDialog(true);
@@ -107,7 +109,7 @@ export const ResourceDataCard = ({
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <DataViewer data={data} name={title} />
+          <DataViewer data={data} name={title} live={live} />
           <Button variant="secondary" size={"xs"} onClick={handleToggle}>
             {live ? "Make Private" : "Make Public"}
           </Button>

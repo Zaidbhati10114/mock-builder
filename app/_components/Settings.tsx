@@ -1,5 +1,9 @@
+"use client";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import React from "react";
+import { DeleteUserModal } from "./UserDeleteModal";
 
 const Settings = () => {
   return (
@@ -12,7 +16,17 @@ const Settings = () => {
         </p>
       </div>
       <Separator />
-      {/* <AccountForm /> */}
+      <div className="space-y-8 mt-4">
+        <div className="flex flex-row max-w-[50vh] items-center justify-between rounded-lg border p-4">
+          <div className="space-y-0.5">
+            <Label className="text-base">Delete Account</Label>
+            <p className="text-xs">
+              Delete your account and all associated data.
+            </p>
+          </div>
+          <DeleteUserModal />
+        </div>
+      </div>
     </div>
   );
 };

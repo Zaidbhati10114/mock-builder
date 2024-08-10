@@ -18,6 +18,7 @@ import { useMutation } from "convex/react";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { useUser } from "@clerk/clerk-react";
+import { ConvexError } from "convex/values";
 
 interface DeleteModalProps {
   id: Id<"projects">;
@@ -33,7 +34,10 @@ const DeleteModal = ({ id }: DeleteModalProps) => {
       toast("Project deleted");
       setIsOpen(false);
     } catch (error) {
-      console.log("errror");
+      const errorMessage =
+        error instanceof ConvexError ? (error.data as string) : "";
+      toast.error(errorMessage);
+      console.log(errorMessage);
     }
   };
   return (

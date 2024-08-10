@@ -11,6 +11,7 @@ import { ResourceDataCard } from "./ResourceDataCard";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { resourceType } from "@/types";
 
 interface ResourceProps {
   projectId: Id<"projects">;
@@ -37,9 +38,15 @@ const Resources = ({ projectId }: ResourceProps) => {
           </div>
           <ul className="flex w-full flex-col gap-6 max-w-[730px]">
             {resource?.map(
-              ({ _id: id, resourceName, data, projectId }: any) => (
+              ({
+                _id: id,
+                resourceName,
+                data,
+                projectId,
+                live,
+              }: resourceType) => (
                 <ResourceDataCard
-                  initialLiveStatus={false}
+                  initialLiveStatus={live}
                   key={id}
                   id={id}
                   title={resourceName}

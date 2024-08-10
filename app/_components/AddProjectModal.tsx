@@ -18,13 +18,12 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-//import toast from "react-hot-toast";
 import { useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useUser } from "@clerk/clerk-react";
-
-//import { toast } from "@/components/ui/use-toast"
+import { useIsSubscribed } from "@/lib/useUserLimitstore";
+import { ConvexError } from "convex/values";
 
 const FormSchema = z.object({
   name: z.string().min(2, {
@@ -35,12 +34,12 @@ const FormSchema = z.object({
 export function AddProject() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { MAX_PROJECTS } = useIsSubscribed();
   const user = useUser();
   const user_info = useQuery(api?.users.getUserById, {
     clerkId: user?.user?.id!,
   });
   const createProject = useMutation(api.projects.createProject);
-  //console.log(user_info);
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
@@ -53,7 +52,6 @@ export function AddProject() {
     try {
       setIsLoading(true);
       const projectId = await createProject({ projectName: data.name });
-      console.log("projectId", projectId);
       if (projectId) {
         form.reset();
         setIsLoading(false);
@@ -64,7 +62,9 @@ export function AddProject() {
         form.reset();
       }
     } catch (error) {
-      console.log("Error occured during create a project", error);
+      const errorMessage =
+        error instanceof ConvexError ? (error.data as string) : "";
+      toast.error(errorMessage);
       setIsLoading(false);
       form.reset();
     }
@@ -79,7 +79,7 @@ export function AddProject() {
         </Button>
       </DialogTrigger>
       <DialogContent>
-        {!user_info?.isPro && user_info?.projectCount! >= 2 ? (
+        {!user_info?.isPro && user_info?.projectCount! >= MAX_PROJECTS ? (
           <div>
             <p className="mb-4">
               Free tier only allows 2 projects. Upgrade to create more!

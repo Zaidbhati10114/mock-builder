@@ -9,6 +9,7 @@ import { Webhook } from "svix";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 import { getResourceByIdHttp } from "./resources";
+import { deleteUser } from './users';
 
 const handleClerkWebhook = httpAction(async (ctx, request) => {
     const event = await validateRequest(request);
@@ -17,6 +18,16 @@ const handleClerkWebhook = httpAction(async (ctx, request) => {
     }
     switch (event.type) {
         case "user.created":
+
+            const existingUser = await ctx.runQuery(internal.users.getUserByEmail, {
+                email: event.data.email_addresses[0].email_address,
+            });
+
+            if (existingUser) {
+                // User already exists, return an error response
+                return new Response("User with this email already exists", { status: 409 });
+            }
+
             await ctx.runMutation(internal.users.createUser, {
                 clerkId: event.data.id,
                 email: event.data.email_addresses[0].email_address,
@@ -37,7 +48,7 @@ const handleClerkWebhook = httpAction(async (ctx, request) => {
             });
             break;
         case "user.deleted":
-            await ctx.runMutation(internal.users.deleteUser, {
+            await ctx.runMutation(internal.users.deleteUserFor, {
                 clerkId: event.data.id as string,
             });
             break;
@@ -53,6 +64,36 @@ http.route({
     path: "/clerk",
     method: "POST",
     handler: handleClerkWebhook,
+});
+
+http.route({
+    path: "/stripe",
+    method: "POST",
+    handler: httpAction(async (ctx, request) => {
+        const signature = request.headers.get("stripe-signature");
+        if (!signature) {
+            return new Response("Missing stripe-signature header", {
+                status: 400
+            });
+        }
+
+        const payload = await request.text();
+
+        const result = await ctx.runAction(internal.stripe.fulfill, {
+            payload,
+            signature
+        });
+
+        if (result.success) {
+            return new Response(null, {
+                status: 200
+            });
+        } else {
+            return new Response(result.error, {
+                status: 400
+            });
+        }
+    })
 });
 
 const validateRequest = async (

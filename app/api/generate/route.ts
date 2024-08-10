@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     try {
         //console.log('Received request');
         const { inputValue } = await req.json();
-        console.log('Input Value:', inputValue);
+
 
         const chatSession = model.startChat({
             generationConfig,
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
         //console.log('Received response from Generative AI');
 
         const textResponse = await result.response.text();
-        console.log('Text Response:', textResponse);
+
 
         return NextResponse.json({ message: textResponse });
     } catch (error) {

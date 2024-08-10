@@ -18,6 +18,8 @@ import { Row } from "@/components/ui/row";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/clerk-react";
+import { useIsSubscribed } from "@/lib/useUserLimitstore";
+import { ConvexError } from "convex/values";
 
 interface FormProps {
   id: string;
@@ -32,6 +34,7 @@ type FormData = z.infer<typeof schema>;
 
 export default function JsonGeneratorForm({ id }: FormProps) {
   const user = useUser();
+  const { MAX_RESOURCES, user: userDetails } = useIsSubscribed();
   const router = useRouter();
   const {
     register,
@@ -75,7 +78,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
   const createResource = useMutation(api.resources.createResource);
   const reduceJsonCount = useMutation(api.resources.reduceJsonGenerationCount);
 
-  const inputData = watch("inputData");
+  //const inputData = watch("inputData");
   const resourceName = watch("resourceName");
 
   const validateAndSaveData = async () => {
@@ -91,6 +94,10 @@ export default function JsonGeneratorForm({ id }: FormProps) {
 
     setLoading(true);
     try {
+      if (userDetails?.resourceCount! >= MAX_RESOURCES) {
+        toast.error("You have reached the maximum number of resources");
+        return;
+      }
       await createResource({
         projectId: id,
         resourceName: resourceName,
@@ -99,7 +106,9 @@ export default function JsonGeneratorForm({ id }: FormProps) {
       router.push(`/dashboard/projects/${id}/resources`);
       toast.success("Data saved successfully");
     } catch (error) {
-      toast.error("Failed to save data");
+      const errorMessage =
+        error instanceof ConvexError ? (error.data as string) : "";
+      toast.error(errorMessage);
       console.error("Failed to save data:", error);
     } finally {
       setLoading(false);
@@ -156,6 +165,17 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     }
   };
 
+  const getTextareaRows = () => {
+    if (typeof window !== "undefined") {
+      const height = window.innerHeight;
+      // Adjust these values as needed
+      if (height < 600) return 10;
+      if (height < 900) return 20;
+      return 30;
+    }
+    return 20; // Default value
+  };
+
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -165,7 +185,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
 
   return (
     <>
-      <div className="flex flex-col md:flex-row p-4 px-6 space-y-8 md:space-y-0 md:space-x-6">
+      <div className="flex flex-col md:flex-row space-y-8 md:space-y-0 md:space-x-6">
         <div className="w-full md:w-1/2 p-3 py-4">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-4">
@@ -184,7 +204,6 @@ export default function JsonGeneratorForm({ id }: FormProps) {
               {errors.inputData && (
                 <p className="text-red-600">{errors.inputData?.message}</p>
               )}
-
               <Label
                 htmlFor="resourceName"
                 className="block text-sm font-medium text-gray-700"
@@ -249,9 +268,8 @@ export default function JsonGeneratorForm({ id }: FormProps) {
               id="jsonOutput"
               value={JSON.stringify(jsonData, null, 2)}
               onChange={(e: any) => setJsonData(JSON.parse(e.target.value))}
-              className="mt-5 block w-full font-mono"
+              className="mt-5 block w-full font-mono h-[calc(100vh-300px)] resize-none overflow-y-auto"
               readOnly={!isEditable}
-              rows={40}
             />
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center bg-opacity-75">

@@ -47,7 +47,7 @@ export const createResource = mutation({
             return resourceId;
         } catch (error) {
             console.error('Error occurred during resource creation:', error);
-            throw error; // Propagate the error back
+            throw new ConvexError("Error occurred during resource creation");
         }
     },
 });
@@ -80,6 +80,7 @@ export const reduceJsonGenerationCount = mutation({
 
         } catch (error) {
             console.error('Error occurred during resource creation:', error);
+            throw new ConvexError("Error occurred during resource creation");
         }
 
     }

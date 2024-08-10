@@ -2,27 +2,8 @@
 import React, { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import {
-  CircleUser,
-  Home,
-  LineChart,
-  Menu,
-  Moon,
-  Package2,
-  Search,
-  ShoppingCart,
-  Sun,
-  Users,
-} from "lucide-react";
+import { FileJson, Menu, Moon, Search, Sun } from "lucide-react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -34,9 +15,11 @@ import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 import { primaryNavItems } from "@/lib";
 import { cn } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
+
 import ProgressBar from "./ProgressBar";
 import JsonProgressBar from "./JsonProgressBar";
+import { SignedIn, SignOutButton, UserButton } from "@clerk/clerk-react";
+import { UserNav } from "./UserNav";
 
 const MobileNav = () => {
   const { setTheme } = useTheme();
@@ -73,6 +56,13 @@ const MobileNav = () => {
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
               <nav className="grid gap-2 text-lg font-medium">
+                <Link
+                  href="#"
+                  className="flex items-center p-1 gap-2 text-lg font-semibold"
+                >
+                  <FileJson className="h-6 w-6" />
+                  <span className="sr-only">Acme Inc</span>
+                </Link>
                 {navItems.map(({ name, icon, link }, idx) => (
                   <div key={idx}>
                     <div className={cn("flex items-center lg:w-full")}>
@@ -106,7 +96,7 @@ const MobileNav = () => {
               </nav>
               <div className="mt-auto">
                 <div className="p-4">
-                  <ProgressBar />
+                  <ProgressBar max_projects={2} />
                 </div>
                 <div className="p-4">
                   <JsonProgressBar />
@@ -115,7 +105,7 @@ const MobileNav = () => {
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-            <form>
+            {/* <form>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -124,7 +114,7 @@ const MobileNav = () => {
                   className="w-full appearance-none bg-background pl-8 shadow-none md:w-2/3 lg:w-1/3"
                 />
               </div>
-            </form>
+            </form> */}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -145,6 +135,11 @@ const MobileNav = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <UserNav />
+          {/* <SignedIn>
+            <UserButton  />
+          </SignedIn> */}
         </header>
       </div>
     </div>
