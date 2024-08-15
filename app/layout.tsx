@@ -4,6 +4,8 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-providers";
 import ConvexClerkProvider from "./providers/ConvexClerkProvider";
 import { Toaster } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
+import Navbar from "./_components/Navbar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,16 +23,9 @@ export default function RootLayout({
     <>
       <html lang="en" suppressHydrationWarning>
         <head />
-        <body>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <ConvexClerkProvider>{children}</ConvexClerkProvider>
-            <Toaster />
-          </ThemeProvider>
+        <body className={cn("")}>
+          <ConvexClerkProvider>{children}</ConvexClerkProvider>
+          <Toaster />
         </body>
       </html>
     </>
