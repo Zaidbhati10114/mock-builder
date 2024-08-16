@@ -122,14 +122,3 @@ export default function Home() {
     </>
   );
 }
-
-{
-  /* <HeroSection />
-      <HowItWorks />
-
-      <DataGenerationAnimation />
-      <StepByStepProcess />
-
-      <Testimonials />
-      <Pricing /> */
-}
