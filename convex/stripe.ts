@@ -23,7 +23,7 @@ export const pay = action({
             throw new Error("you must have a verified email to subscribe");
         }
 
-        const domain = process.env.HOSTING_URL ?? "http://localhost:3000/dashboard";
+        const domain = process.env.HOSTING_URL ?? "https://mock-builder.vercel.app/dashboard";
         const stripe = new Stripe(process.env.STRIPE_KEY!, {
             apiVersion: "2024-06-20",
         });
