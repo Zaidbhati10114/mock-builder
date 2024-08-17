@@ -20,9 +20,10 @@ import ProgressBar from "./ProgressBar";
 import JsonProgressBar from "./JsonProgressBar";
 import { SignedIn, SignOutButton, UserButton } from "@clerk/clerk-react";
 import { UserNav } from "./UserNav";
+import { useDashboardTheme } from "@/hooks/useDashboardTheme";
 
 const MobileNav = () => {
-  const { setTheme } = useTheme();
+  const { setTheme, theme } = useDashboardTheme();
   const [navItems, setNavItems] = useState([...primaryNavItems]);
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = useState(false);

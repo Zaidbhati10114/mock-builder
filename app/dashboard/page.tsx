@@ -11,6 +11,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { ConvexError } from "convex/values";
 import { toast } from "sonner";
+import { Banner } from "../_components/Banner";
 
 const DashboardPage = () => {
   const [error, setError] = useState("");
@@ -26,9 +27,7 @@ const DashboardPage = () => {
       <BreadcrumbPageWrapper breadcrumbs={dashboardBreadcrumbs}>
         {user && (
           <main className="flex flex-1 flex-col gap-4 p-4 lg:px-8">
-            <h1>Dashboard</h1>
-            {!get_user || (!user && <Button>Sign In</Button>)}
-            {}
+            <Banner />
           </main>
         )}
       </BreadcrumbPageWrapper>

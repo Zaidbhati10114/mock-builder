@@ -12,6 +12,7 @@ const convex = new ConvexReactClient(
 
 const ConvexClerkProvider = ({ children }: { children: ReactNode }) => (
   <ClerkProvider
+    afterSignOutUrl="/"
     appearance={{
       baseTheme: dark,
       layout: {

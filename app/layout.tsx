@@ -6,13 +6,11 @@ import ConvexClerkProvider from "./providers/ConvexClerkProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import Navbar from "./_components/Navbar";
+import { constructMetadata } from "../lib/utils";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: "Mock Builder",
-  description: "Create mock data for your project",
-};
+export const metadata = constructMetadata();
 
 export default function RootLayout({
   children,

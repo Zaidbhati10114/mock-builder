@@ -11,14 +11,17 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useUser } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader } from "lucide-react";
+import { useDashboardTheme } from "@/hooks/useDashboardTheme";
 
 export function UserNav() {
   const { user, isLoaded: userLoaded } = useUser();
+  const { signOut } = useClerk();
   const router = useRouter();
+  const { setTheme } = useDashboardTheme();
   const [isLoading, setIsLoading] = useState(false); // Set initial state to false
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -33,23 +36,30 @@ export function UserNav() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/logout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      await signOut();
+      setTheme("light");
+      router.push("/");
+      // window.location.href = "/";
+      // const response = await fetch("/api/logout", {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //   },
+      // });
 
-      const result = await response.json();
+      // const result = await response.json();
 
-      if (result.success) {
-        router.push("/");
-      } else {
-        console.error("Failed to log out:", result.message);
-        setIsLoading(false);
-      }
+      // if (result.success) {
+      //   setTheme("light");
+      //   router.replace("/");
+      // } else {
+      //   console.error("Failed to log out:", result.message);
+      //   setIsLoading(false);
+      // }
     } catch (error) {
       console.error("Logout error:", error);
+      setIsLoading(false);
+    } finally {
       setIsLoading(false);
     }
   };

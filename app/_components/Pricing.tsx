@@ -11,9 +11,10 @@ import { cn } from "@/lib/utils";
 import { ArrowRight, Check, HelpCircle, Minus } from "lucide-react";
 import Link from "next/link";
 import MaxWidthWrapper from "./MaxWidthWrapper";
+import { useUser } from "@clerk/clerk-react";
 
 const Pricing = () => {
-  const user = true;
+  const user = useUser();
 
   const pricingItems = [
     {
@@ -24,6 +25,10 @@ const Pricing = () => {
         {
           text: "2 projects",
           footnote: "Create up to 2 projects.",
+        },
+        {
+          text: "No Credit Card Required",
+          footnote: "No credit card required for free plan.",
         },
         {
           text: "4 resources",
@@ -164,12 +169,20 @@ const Pricing = () => {
                           variant: "secondary",
                         })}
                       >
-                        {user ? "Upgrade now" : "Sign up"}
+                        {user ? "Get Started" : "Sign up"}
                         <ArrowRight className="h-5 w-5 ml-1.5" />
                       </Link>
                     ) : user ? (
-                      // <UpgradeButton />
-                      <Button>Upgrade</Button>
+                      <Link
+                        href={user ? "/dashboard" : "/sign-in"}
+                        className={buttonVariants({
+                          className: "w-full",
+                          variant: "secondary",
+                        })}
+                      >
+                        {user ? "Get Started" : "Sign up"}
+                        <ArrowRight className="h-5 w-5 ml-1.5" />
+                      </Link>
                     ) : (
                       <Link
                         href="/sign-in"

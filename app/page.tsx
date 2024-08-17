@@ -1,17 +1,19 @@
 "use client";
 import { buttonVariants } from "@/components/ui/button";
-import { useClerk, useUser } from "@clerk/clerk-react";
+
 import { useRouter } from "next/navigation";
 import Navbar from "./_components/Navbar";
 import MaxWidthWrapper from "./_components/MaxWidthWrapper";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { PromptOutputSwitcher } from "./_components/Example";
+import { useUser } from "@clerk/clerk-react";
 import Pricing from "./_components/Pricing";
 import Footer from "./_components/Footer";
+import { useIsSubscribed } from "@/lib/useUserLimitstore";
 
 export default function Home() {
-  const { user } = useUser();
+  const user = useUser();
   const router = useRouter();
 
   return (
@@ -24,8 +26,8 @@ export default function Home() {
           </p>
         </div>
         <h1 className="max-w-4xl text-5xl font-bold md:text-6xl lg:text-7xl">
-          AI Powered <span className="text-blue-600">Mock Data</span> Generation
-          in seconds.
+          AI Powered <span className="text-blue-600">Mock JSON Data</span>{" "}
+          Generation in seconds.
         </h1>
         <p className="mt-5 max-w-prose text-zinc-700 sm:text-lg">
           Create, Edit, Save, and Fetch Your Data with Ease
@@ -36,10 +38,9 @@ export default function Home() {
             size: "lg",
             className: "mt-5",
           })}
-          href="/signup"
-          target="_blank"
+          href="/sign-up"
         >
-          {user ? "Sign in" : "Get started"}{" "}
+          {user.isSignedIn ? "Dashboard" : "Get started"}{" "}
           <ArrowRight className="ml-2 h-5 w-5" />
         </Link>
       </MaxWidthWrapper>
