@@ -1,5 +1,8 @@
 import { FileJson } from "lucide-react";
 import React from "react";
+import PrivacyPolicy from "./PrivacyPolicy";
+import MITLicenseModal from "./Licensing";
+import AboutModal from "./About";
 
 const Footer = () => {
   return (
@@ -17,22 +20,20 @@ const Footer = () => {
           </a>
           <ul className="flex flex-wrap items-center mb-6 text-sm font-medium text-gray-500 sm:mb-0 dark:text-gray-400">
             <li>
-              <a href="#" className="hover:underline me-4 md:me-6">
-                About
-              </a>
+              <AboutModal />
             </li>
             <li>
-              <a href="#" className="hover:underline me-4 md:me-6">
-                Privacy Policy
-              </a>
+              <PrivacyPolicy />
             </li>
             <li>
-              <a href="#" className="hover:underline me-4 md:me-6">
-                Licensing
-              </a>
+              <MITLicenseModal />
             </li>
             <li>
-              <a href="#" className="hover:underline">
+              <a
+                target="_blank"
+                href="https://www.zaidbhati.tech/"
+                className="hover:underline"
+              >
                 Contact
               </a>
             </li>

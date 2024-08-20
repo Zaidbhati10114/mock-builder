@@ -39,7 +39,7 @@ export function UserNav() {
     try {
       await signOut();
       setTheme("light");
-      router.push("/");
+      router.replace("/");
       // window.location.href = "/";
       // const response = await fetch("/api/logout", {
       //   method: "POST",

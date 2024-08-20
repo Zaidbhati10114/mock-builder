@@ -34,14 +34,14 @@ export default function Home() {
         </p>
 
         <Link
-          className={buttonVariants({
+          className={`flex items-center ${buttonVariants({
             size: "lg",
             className: "mt-5",
-          })}
+          })} group`}
           href="/sign-up"
         >
           {user.isSignedIn ? "Dashboard" : "Get started"}{" "}
-          <ArrowRight className="ml-2 h-5 w-5" />
+          <ArrowRight className="ml-2 h-5 w-5 transform transition-transform duration-300 ease-in-out group-hover:translate-x-1.5" />
         </Link>
       </MaxWidthWrapper>
 

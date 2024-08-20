@@ -19,26 +19,30 @@ const Navbar = () => {
             <FileJson className="mr-2 size-6" />
             <span>MockBuilder</span>
           </Link>
-          <MobileNavLanding isAuth={!!user} />
-          <div className="hidden items-center space-x-4 sm:flex">
+          {/* <MobileNavLanding isAuth={!!user} /> */}
+          <div className=" items-center space-x-4 sm:flex">
             {user.isSignedIn ? (
               <>
                 <Link
-                  className={buttonVariants({ variant: "ghost", size: "sm" })}
-                  href={"/dashboard"}
+                  className={`flex items-center ${buttonVariants({ variant: "ghost", size: "sm" })} group`}
+                  href={"/sign-in"}
                 >
-                  <button>Dashboard</button>
-                  <ArrowRight className="ml-1.5 h-5 w-5" />
+                  <button className="flex items-center">
+                    Dashboard
+                    <ArrowRight className="ml-1.5 h-5 w-5 transform transition-transform duration-300 ease-in-out group-hover:translate-x-1.5" />
+                  </button>
                 </Link>
               </>
             ) : (
               <>
                 <Link
-                  className={buttonVariants({ variant: "ghost", size: "sm" })}
+                  className={`flex items-center ${buttonVariants({ variant: "ghost", size: "sm" })} group`}
                   href={"/sign-in"}
                 >
-                  <button>Sign in</button>
-                  <ArrowRight className="ml-1.5 h-5 w-5" />
+                  <button className="flex items-center">
+                    Sign in
+                    <ArrowRight className="ml-1.5 h-5 w-5 transform transition-transform duration-300 ease-in-out group-hover:translate-x-1.5" />
+                  </button>
                 </Link>
               </>
             )}
