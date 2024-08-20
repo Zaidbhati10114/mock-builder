@@ -24,7 +24,7 @@ export default function HowItWorks() {
     <div className="py-16 bg-white text-gray-900">
       <div className="container mx-auto">
         <h2 className="text-4xl font-bold text-center mb-8">How It Works</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {steps.map((step, index) => (
             <motion.div
               key={index}

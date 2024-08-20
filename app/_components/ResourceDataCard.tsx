@@ -42,6 +42,7 @@ export const ResourceDataCard = ({
 }: ResourceDataCardProps) => {
   const deleteResource = useMutation(api.resources.deleteResource);
   const user = useUser();
+
   const toggleResourceLive = useMutation(api.resources.toggleProjectLive);
   const [live, setLive] = useState(initialLiveStatus);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -109,10 +110,11 @@ export const ResourceDataCard = ({
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <DataViewer data={data} name={title} live={live} />
+          <DataViewer id={id} data={data} name={title} live={live} />
           <Button variant="secondary" size={"xs"} onClick={handleToggle}>
             {live ? "Make Private" : "Make Public"}
           </Button>
+          {}
           <Button variant="destructive" size={"xs"} onClick={handleDelete}>
             Delete
           </Button>

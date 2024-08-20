@@ -10,7 +10,6 @@ export default function RootLayout({
       <main className="relative h-screen w-full">
         <div className="absolute inset-0 bg-green-100"></div>
         {children}
-        <p>Copyright @Zaid</p>
       </main>
     </>
   );

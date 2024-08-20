@@ -227,7 +227,10 @@ export const getResourceByIdHttp = httpAction(async (ctx: GenericActionCtx<any>,
 
         return new Response(JSON.stringify(resource.data), {
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                "Access-Control-Allow-Methods": "GET, POST",
+                "Access-Control-Allow-Headers": "Content-Type",
             },
             status: 200
         });

@@ -20,14 +20,27 @@ import {
 import { Badge } from "@/components/ui/badge";
 import JSONPretty from "react-json-pretty";
 import "react-json-pretty/themes/monikai.css";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+
+import { Id } from "@/convex/_generated/dataModel";
+import { Hint } from "./Hint";
 
 interface DataViewProps {
   data: any;
   name: string;
   live?: boolean;
+  id: Id<"resources">;
 }
 
-export function DataViewer({ data, name, live }: DataViewProps) {
+export function DataViewer({ data, name, live, id }: DataViewProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [language, setLanguage] = useState("typescript");
 
@@ -55,6 +68,13 @@ fetchData()
   const copyCodeSnippet = () => {
     navigator.clipboard.writeText(fetchCodeSnippet);
     toast.success("Code snippet copied to clipboard");
+  };
+
+  const handleCopyLink = () => {
+    // Replace this with the actual link generation logic
+    const link = `https://proficient-opossum-116.convex.site/get-resource?resourceID=${id}`;
+    navigator.clipboard.writeText(link);
+    toast.success("Link copied to clipboard");
   };
 
   return (
@@ -89,6 +109,19 @@ fetchData()
                 <Share className="h-4 w-5 mr-1" />
                 Share
               </TabsTrigger>
+              <Hint
+                label={live ? "Live" : "Not live"}
+                side="top"
+                align="center"
+              >
+                <TabsTrigger
+                  disabled={!live}
+                  value="Live"
+                  className="px-3 py-1"
+                >
+                  Live
+                </TabsTrigger>
+              </Hint>
             </TabsList>
             {/* <div className="flex items-center space-x-2">
               
@@ -154,54 +187,68 @@ fetchData()
               </div>
               <div className="flex-grow rounded-md bg-black p-4 overflow-hidden">
                 <pre className="h-full text-sm text-muted-foreground overflow-auto">
-                  <code className="whitespace-pre">{fetchCodeSnippet}</code>
+                  <code className="whitespace-pre text-md">
+                    <JSONPretty
+                      id="json-pretty"
+                      data={fetchCodeSnippet}
+                      theme={{
+                        main: "line-height:1.3;color:#66d9ef;background:#272822;overflow:auto;",
+                        error:
+                          "line-height:1.3;color:#66d9ef;background:#272822;overflow:auto;",
+                        key: "color:#f92672;",
+                        string: "color:#fd971f;",
+                        value: "color:#a6e22e;",
+                        boolean: "color:#ac81fe;",
+                      }}
+                    />
+                  </code>
                 </pre>
               </div>
             </div>
+          </TabsContent>
+          <TabsContent value="Live" className="mt-4 flex-grow overflow-y-auto">
+            {live && (
+              <Card className="">
+                <CardHeader>
+                  <CardTitle>Fetch this document</CardTitle>
+                  <CardDescription>
+                    Anyone with the fetch or make a get request till its status
+                    is live can have access this document.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex space-x-2">
+                    <Input
+                      defaultValue={`https://proficient-opossum-116.convex.site/get-resource?resourceID=${id}`}
+                      readOnly
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={handleCopyLink}
+                      className="shrink-0"
+                    >
+                      Copy Link
+                    </Button>
+                  </div>
+                  <Separator className="my-4" />
+                </CardContent>
+              </Card>
+            )}
+            {!live && (
+              <Card>
+                <CardTitle className="text-sm text-muted-foreground">
+                  Live
+                </CardTitle>
+                <CardDescription>
+                  <div className="space-y-4">
+                    <p>This resource is not live yet</p>
+                  </div>
+                </CardDescription>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
   );
-}
-
-function renderJSON(obj: any, level = 0) {
-  const indent = "  ".repeat(level);
-
-  if (Array.isArray(obj)) {
-    return (
-      <>
-        {"[\n"}
-        {obj.map((item, index) => (
-          <React.Fragment key={index}>
-            {indent} {renderJSON(item, level + 1)}
-            {index < obj.length - 1 ? "," : ""}
-            {"\n"}
-          </React.Fragment>
-        ))}
-        {indent}
-        {"]"}
-      </>
-    );
-  } else if (typeof obj === "object" && obj !== null) {
-    return (
-      <>
-        {"{\n"}
-        {Object.entries(obj).map(([key, value], index, array) => (
-          <React.Fragment key={key}>
-            {indent} <span className="text-black">{JSON.stringify(key)}</span>:{" "}
-            <span className="text-green-500">
-              {renderJSON(value, level + 1)}
-            </span>
-            {index < array.length - 1 ? "," : ""}
-            {"\n"}
-          </React.Fragment>
-        ))}
-        {indent}
-        {"}"}
-      </>
-    );
-  } else {
-    return <span className="text-green-500">{JSON.stringify(obj)}</span>;
-  }
 }
