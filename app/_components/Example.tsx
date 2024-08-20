@@ -27,7 +27,7 @@ export const promptsAndOutputs = [
     },
   },
   {
-    prompt: "Generate a simple",
+    prompt: "Generate a simple recipe",
     output: {
       name: "Quick Cookies",
       prepTime: "15 mins",
@@ -53,53 +53,25 @@ export const PromptOutputSwitcher = () => {
   const currentOutput = promptsAndOutputs[currentIndex].output;
 
   return (
-    <div className="flex flex-col lg:flex-row items-start justify-center space-y-8 lg:space-y-0 lg:space-x-8">
+    <div className="flex flex-col md:flex-row items-stretch justify-center space-y-4 md:space-y-0 md:space-x-6 p-4 bg-gray-800 rounded-lg shadow-lg">
       {/* Prompt Box */}
-      <div className="p-6 bg-gray-800 rounded-lg shadow-lg w-[600px] h-[600px] flex flex-col justify-center items-center">
-        <h3 className="text-xl font-bold mb-4 text-center">Prompt</h3>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentIndex}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className="w-full flex-grow flex items-center justify-center overflow-hidden"
-          >
-            <p className="text-2xl text-center font-extralight text-blue-500">
-              {currentPrompt}
-            </p>
-          </motion.div>
-        </AnimatePresence>
+      <div className="flex-1 p-4 bg-white text-gray-800 rounded-md shadow-md text-center flex items-center justify-center">
+        <div>
+          <h2 className="text-xl font-bold mb-4">Prompt</h2>
+          <p>{currentPrompt}</p>
+        </div>
       </div>
+
       {/* Output Box */}
-      <div className="p-6 bg-gray-800 rounded-lg shadow-lg w-[800px] h-[600px] flex justify-center items-center overflow-hidden">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentIndex}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className="w-full h-full"
-          >
-            <SyntaxHighlighter
-              language="json"
-              style={solarizedlight}
-              customStyle={{
-                fontSize: "1.5rem",
-                height: "100%",
-                width: "100%",
-                margin: 0,
-              }}
-            >
-              {JSON.stringify(currentOutput, null, 2)}
-            </SyntaxHighlighter>
-          </motion.div>
-        </AnimatePresence>
+      <div className="flex-1 p-4 bg-white text-gray-800 rounded-md shadow-md flex items-center">
+        <SyntaxHighlighter
+          language="json"
+          style={solarizedlight}
+          customStyle={{ borderRadius: "0.5rem", width: "100%" }}
+        >
+          {JSON.stringify(currentOutput, null, 2)}
+        </SyntaxHighlighter>
       </div>
     </div>
   );
 };
-// className="p-6 bg-gray-800 rounded-lg shadow-lg w-full md:w-1/2 flex justify-center items-center text-center"
-//style={{ height: 'auto', minHeight: '400px' }}

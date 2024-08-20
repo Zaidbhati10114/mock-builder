@@ -99,7 +99,7 @@ export const ResourceDataCard = ({
     <Card>
       <li
         key={id}
-        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-lg bg-doc bg-cover p-3 sm:p-5 shadow-xl"
+        className="flex flex-col  sm:flex-row items-start sm:items-center justify-between gap-4 rounded-lg bg-doc bg-cover p-3 sm:p-5 shadow-xl"
       >
         <div className="flex flex-1 items-center gap-4 w-full sm:w-auto mb-3 sm:mb-0">
           <div className="rounded-md p-2">
