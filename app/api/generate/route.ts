@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const apiKey = process.env.GEMINI_API_KEY!;
+const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not defined');
 }
@@ -12,7 +12,7 @@ if (!apiKey) {
 const genAI = new GoogleGenerativeAI(apiKey);
 
 const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-1.5-flash', // Ensure this model is correctly defined in the library
 });
 
 const generationConfig = {
@@ -20,26 +20,20 @@ const generationConfig = {
     topP: 0.95,
     topK: 64,
     maxOutputTokens: 8192,
-    responseMimeType: 'text/plain',
+    responseMimeType: 'text/plain', // Ensure this is correct
 };
 
 export async function POST(req: NextRequest) {
     try {
-        //console.log('Received request');
         const { inputValue } = await req.json();
-
 
         const chatSession = model.startChat({
             generationConfig,
             history: [],
         });
 
-        //console.log('Sending message to Generative AI');
         const result = await chatSession.sendMessage(inputValue);
-        //console.log('Received response from Generative AI');
-
-        const textResponse = await result.response.text();
-
+        const textResponse = result.response; // Ensure this matches the API structure
 
         return NextResponse.json({ message: textResponse });
     } catch (error) {

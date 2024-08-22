@@ -21,6 +21,11 @@ export default function RootLayout({
     <>
       <html lang="en" suppressHydrationWarning>
         <head />
+        <script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="f3c9bb7f-3445-481a-82f0-3ed7259a95b1"
+        ></script>
         <body className={cn("")}>
           <ConvexClerkProvider>{children}</ConvexClerkProvider>
           <Toaster />
