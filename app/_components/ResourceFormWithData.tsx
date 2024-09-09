@@ -184,16 +184,18 @@ export default function Component({ id }: FormProps) {
       });
 
       const result = await response.json();
-      const generatedJsonString = result.message
-        .replace(/```json\n|```/g, "")
-        .trim();
+      console.log(result);
+      setGeneratedData(result.message);
+      // const generatedJsonString = result.message
+      //   .replace(/```json\n|```/g, "")
+      //   .trim();
 
-      const jsonObjects: GeneratedData[] = generatedJsonString
-        .split("\n\n")
-        .map((json: string) => JSON.parse(json));
+      // const jsonObjects: GeneratedData[] = generatedJsonString
+      //   .split("\n\n")
+      //   .map((json: string) => JSON.parse(json));
 
-      const sortedData = jsonObjects.sort((a, b) => a.id - b.id);
-      setGeneratedData(sortedData);
+      // const sortedData = jsonObjects.sort((a, b) => a.id - b.id);
+      // setGeneratedData(sortedData);
     } catch (error) {
       console.error("Failed to parse JSON or API call failed:", error);
     } finally {

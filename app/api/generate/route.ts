@@ -12,7 +12,7 @@ if (!apiKey) {
 const genAI = new GoogleGenerativeAI(apiKey);
 
 const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash', // Ensure this model is correctly defined in the library
+    model: 'gemini-1.5-flash',
 });
 
 const generationConfig = {
@@ -20,12 +20,20 @@ const generationConfig = {
     topP: 0.95,
     topK: 64,
     maxOutputTokens: 8192,
-    responseMimeType: 'text/plain', // Ensure this is correct
 };
+
+function stripMarkdown(text: string): string {
+    // Remove Markdown code block syntax
+    return text.replace(/^```json\n|```$/g, '').trim();
+}
 
 export async function POST(req: NextRequest) {
     try {
         const { inputValue } = await req.json();
+
+        if (!inputValue) {
+            return NextResponse.json({ error: 'No input value provided' }, { status: 400 });
+        }
 
         const chatSession = model.startChat({
             generationConfig,
@@ -33,11 +41,28 @@ export async function POST(req: NextRequest) {
         });
 
         const result = await chatSession.sendMessage(inputValue);
-        const textResponse = result.response; // Ensure this matches the API structure
+        let textResponse = await result.response.text();
 
-        return NextResponse.json({ message: textResponse });
+        console.log('Raw AI response:', textResponse);
+
+        // Strip Markdown syntax
+        textResponse = stripMarkdown(textResponse);
+
+        try {
+            const jsonData = JSON.parse(textResponse);
+            return NextResponse.json({ message: jsonData });
+        } catch (parseError) {
+            console.error('Failed to parse response as JSON:', parseError);
+            return NextResponse.json({
+                error: 'Invalid JSON response from AI',
+                rawResponse: textResponse
+            }, { status: 422 });
+        }
     } catch (error) {
         console.error('Error in API route:', error);
-        return NextResponse.json({ error: 'Failed to generate response' }, { status: 500 });
+        return NextResponse.json({
+            error: 'Failed to generate response',
+            details: error instanceof Error ? error.message : String(error)
+        }, { status: 500 });
     }
 }

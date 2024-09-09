@@ -130,24 +130,30 @@ export default function JsonGeneratorForm({ id }: FormProps) {
       });
 
       const result = await response.json();
+      console.log("API Response:", result);
 
-      const generatedJsonString = result.message
-        .replace(/```json\n|```/g, "")
-        .trim();
+      if (!response.ok) {
+        throw new Error(
+          result.error || `HTTP error! status: ${response.status}`
+        );
+      }
 
-      const parsedJson = JSON.parse(generatedJsonString);
-      setJsonData(parsedJson);
-      // setLoading(false);
+      if (!result.message || typeof result.message !== "object") {
+        throw new Error("Unexpected response format");
+      }
+
+      setJsonData(result.message);
       setIsEditable(true);
-    } catch (error) {
-      setLoading(false);
-      toast.error("Failed to generate JSON data");
+      toast.success("JSON data generated successfully");
+    } catch (error: any) {
+      console.error("Error in onSubmit:", error);
+      toast.error(`Failed to generate JSON data: ${error.message}`);
+      setJsonData(null);
     } finally {
       setLoading(false);
       await reduceJsonCount({ clerkId: user?.user?.id! });
     }
   };
-
   const handleClick = (title: string) => {
     setValue("inputData", title);
   };
@@ -163,17 +169,6 @@ export default function JsonGeneratorForm({ id }: FormProps) {
       navigator.clipboard.writeText(JSON.stringify(jsonData, null, 2));
       toast.success("JSON copied to clipboard");
     }
-  };
-
-  const getTextareaRows = () => {
-    if (typeof window !== "undefined") {
-      const height = window.innerHeight;
-      // Adjust these values as needed
-      if (height < 600) return 10;
-      if (height < 900) return 20;
-      return 30;
-    }
-    return 20; // Default value
   };
 
   useEffect(() => {
