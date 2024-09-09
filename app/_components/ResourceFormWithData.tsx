@@ -172,7 +172,7 @@ export default function Component({ id }: FormProps) {
     const fieldsList = selectedFields
       .map((field) => `${field.label}: ${field.type}`)
       .join(", ");
-    const prompt = `Can you please generate ${objectsCount} JSON Objects fake data for these ${fieldsList}  please return the JSON objects in a list every object must contain a id number`;
+    const prompt = `Can you please generate ${objectsCount} JSON Objects fake data for these ${fieldsList}  please return the only JSON objects in a list every object must contain a id number`;
 
     try {
       const response = await fetch("/api/generate", {
