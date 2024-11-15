@@ -23,8 +23,11 @@ const generationConfig = {
 };
 
 function stripMarkdown(text: string): string {
-    // Remove Markdown code block syntax
-    return text.replace(/^```json\n|```$/g, '').trim();
+    // Remove all Markdown code block syntax and any extra whitespace
+    return text
+        .replace(/^```[\w]*\n|```$/gm, '') // Remove code block syntax including language identifier
+        .trim() // Remove leading/trailing whitespace
+        .replace(/\n+/g, '\n'); // Normalize line breaks
 }
 
 export async function POST(req: NextRequest) {
@@ -48,14 +51,22 @@ export async function POST(req: NextRequest) {
         // Strip Markdown syntax
         textResponse = stripMarkdown(textResponse);
 
+        console.log('Cleaned response:', textResponse); // Add this for debugging
+
         try {
+            // Ensure we're working with valid JSON
+            if (!textResponse.startsWith('[') && !textResponse.startsWith('{')) {
+                throw new Error('Response is not in JSON format');
+            }
+
             const jsonData = JSON.parse(textResponse);
             return NextResponse.json({ message: jsonData });
         } catch (parseError) {
             console.error('Failed to parse response as JSON:', parseError);
             return NextResponse.json({
                 error: 'Invalid JSON response from AI',
-                rawResponse: textResponse
+                rawResponse: textResponse,
+                parseError: parseError instanceof Error ? parseError.message : String(parseError)
             }, { status: 422 });
         }
     } catch (error) {

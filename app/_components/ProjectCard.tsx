@@ -39,7 +39,7 @@ const ProjectCard = ({ id, title, createdAt }: ProjectCardProps) => {
               variant={"secondary"}
               className="w-full sm:w-auto"
             >
-              Create Test
+              Generate Data
             </Button>
           </Link>
           <Link
