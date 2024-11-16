@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { redirect } from "next/navigation";
 
 
 export const createProject = mutation({
@@ -76,7 +77,7 @@ export const getProject = query({
     handler: async (ctx, args) => {
         const project = await ctx.db.get(args.id);
         if (!project) {
-            throw new ConvexError("Project not found");
+            redirect("/dashboard/empty");
         }
         return project;
     },

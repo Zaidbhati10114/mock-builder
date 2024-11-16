@@ -12,5 +12,6 @@
                     </Button>
                   </CardContent>
                 </Card>
+                
 
                 i have an app which generates mock data saves them in further generates an ur l ,when fetched the url gets the data generated i want t build an landing page for that need good animations and small showcase of my app func through animations or anything interesting suggest some ideas also libraries or approach to achieve them .It is an web fyi 
