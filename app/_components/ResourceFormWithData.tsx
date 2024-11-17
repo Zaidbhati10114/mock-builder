@@ -120,7 +120,8 @@ export default function JSONGenerator({ id }: FormProps) {
       await navigator.clipboard.writeText(textToCopy);
       toast.success("Data copied to clipboard!");
     } catch (err) {
-      fallbackCopyTextToClipboard(textToCopy);
+      //fallbackCopyTextToClipboard(textToCopy);
+      toast.error("Failed to copy data. Please try again.");
     } finally {
       setIsCopying(false);
     }
@@ -152,6 +153,8 @@ export default function JSONGenerator({ id }: FormProps) {
     document.body.removeChild(textArea);
   };
 
+  // In JSONGenerator component, modify the onSubmit function:
+
   const onSubmit = async (data: FormValues) => {
     setIsLoading(true);
     setError(null);
@@ -167,7 +170,12 @@ export default function JSONGenerator({ id }: FormProps) {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputValue: prompt }),
+        body: JSON.stringify({
+          inputValue: prompt,
+          model: data.model, // Add model
+          resources: data.resources, // Add resources
+          objectsCount: data.objectsCount, // Add objectsCount
+        }),
       });
 
       if (!response.ok) {
@@ -189,7 +197,6 @@ export default function JSONGenerator({ id }: FormProps) {
       setIsLoading(false);
     }
   };
-
   const handleReset = () => {
     reset({
       model: "",

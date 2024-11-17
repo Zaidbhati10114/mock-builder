@@ -63,14 +63,6 @@ export const optionsData: Record<string, Option> = {
       { label: "alphaNumeric", type: "text" },
     ],
   },
-  Company: {
-    fields: [
-      { label: "companyName", type: "text" },
-      { label: "catchPhrase", type: "text" },
-      { label: "bs", type: "text" },
-      { label: "ein", type: "text" },
-    ],
-  },
   Database: {
     fields: [
       { label: "column", type: "text" },

@@ -1,88 +1,185 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+// Initialize Google AI with error handling
+const initializeAI = () => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error('GEMINI_API_KEY is not configured');
+    }
+    return new GoogleGenerativeAI(apiKey);
+};
+
+// Input validation schema
+const requestSchema = z.object({
+    inputValue: z.string().min(1, "Prompt is required"),
+    model: z.enum(["genesis", "explorer"]).optional(),
+    resources: z.string().min(1, "Resource type is required"),
+    objectsCount: z.number().min(1).max(100),
+});
+
+// Type definitions
+type GenerationRequest = z.infer<typeof requestSchema>;
+type FieldDefinition = {
+    label: string;
+    type: string;
+    required?: boolean;
+};
+
+// Response validation schema builder
+const createResponseSchema = (fields: FieldDefinition[]) => {
+    const schemaFields: Record<string, z.ZodType<any>> = {
+        id: z.number(),
+    };
+
+    fields.forEach(field => {
+        const fieldSchema = (() => {
+            switch (field.type.toLowerCase()) {
+                case 'string':
+                    return z.string();
+                case 'number':
+                    return z.number();
+                case 'boolean':
+                    return z.boolean();
+                case 'date':
+                    return z.string().datetime();
+                case 'email':
+                    return z.string().email();
+                case 'url':
+                    return z.string().url();
+                default:
+                    return z.string();
+            }
+        })();
+
+        schemaFields[field.label] = field.required ? fieldSchema : fieldSchema.optional();
+    });
+
+    return z.array(z.object(schemaFields));
+};
 
 export async function POST(request: Request) {
     try {
+        // Initialize AI service
+        const genAI = initializeAI();
+
+        // Parse and validate request body
         const body = await request.json();
-        const { prompt } = body;
+        const validatedData = requestSchema.parse(body);
 
-        if (!prompt) {
-            return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
-        }
+        // Select appropriate model
+        const modelName = validatedData.model === 'genesis' ? 'gemini-pro' : 'gemini-pro';
+        const model = genAI.getGenerativeModel({ model: modelName });
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        // Generate prompt with specific constraints
+        const prompt = generateStructuredPrompt(validatedData);
 
-        // Dynamically format the prompt based on the content
-        const dynamicPrompt = formatPromptForQuery(prompt);
+        // Generate content with retry mechanism
+        const response = await generateWithRetry(model, prompt);
 
-        const result = await model.generateContent(dynamicPrompt);
-        const response = await result.response;
-        const text = await response.text();
+        // Process and validate the response
+        const processedData = await processAIResponse(response, validatedData);
 
-        // Log the raw response for debugging purposes
-        console.log('Raw response from AI:', text);
-
-        // Clean up the AI response to ensure it's valid JSON
-        const cleanedText = cleanResponse(text);
-
-        // Try parsing the cleaned response
-        try {
-            const parsedData = JSON.parse(cleanedText);
-
-            // Validate that the response is in the correct format
-            if (!Array.isArray(parsedData)) {
-                throw new Error('Invalid data structure: Expected an array.');
-            }
-
-            // Optionally, validate each item to ensure required fields exist
-            parsedData.forEach((item, index) => {
-                if (!item.id || !item.name) {
-                    throw new Error(`Invalid data structure: Missing 'id' or 'name' at index ${index}`);
-                }
-            });
-
-            return NextResponse.json(parsedData);
-
-        } catch (e) {
-            console.error('Failed to parse or validate JSON:', e);
-            return NextResponse.json(
-                { error: 'Failed to generate valid JSON data: Invalid structure or missing fields.' },
-                { status: 500 }
-            );
-        }
+        return NextResponse.json({
+            message: processedData,
+            status: 'success'
+        });
 
     } catch (error) {
-        console.error('Failed to generate content:', error);
-        return NextResponse.json(
-            { error: 'Failed to generate content' },
-            { status: 500 }
-        );
+        console.error('Generation error:', error);
+
+        if (error instanceof z.ZodError) {
+            return NextResponse.json({
+                error: 'Validation error',
+                details: error.errors
+            }, { status: 400 });
+        }
+
+        return NextResponse.json({
+            error: error instanceof Error ? error.message : 'Internal server error'
+        }, { status: 500 });
     }
 }
 
-// Function to dynamically create the prompt based on the user's request
-function formatPromptForQuery(prompt: string): string {
-    return `
-    Based on the user's request, generate a JSON array of relevant items.
-    The array must have at least 3 items and contain the following fields:
-    - id: A unique identifier (numeric or string)
-    - name: The name or description of the item
-    - additional info: Provide additional information related to the item (if applicable)
+async function generateWithRetry(model: any, prompt: string, maxRetries = 3) {
+    let lastError;
 
-    Here is the user request: "${prompt}"
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            return response;
+        } catch (error) {
+            lastError = error;
+            if (attempt === maxRetries) break;
 
-    Ensure that the response:
-    1. Is a valid JSON array
-    2. Each item in the array contains the 'id', 'name', and 'additional info' fields
-    3. The content is relevant to the user's request
-    4. No additional text or irrelevant content should be included in the response
-  `;
+            // Exponential backoff
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
+    }
+
+    throw lastError || new Error('Failed to generate content after multiple attempts');
 }
 
-// Function to clean up AI response text
-function cleanResponse(text: string): string {
-    // Remove markdown code fences and trim whitespace
-    return text.replace(/```json|```/g, '').trim();
+function generateStructuredPrompt({ inputValue, objectsCount, resources }: GenerationRequest): string {
+    return `
+Generate exactly ${objectsCount} JSON objects based on the following requirements:
+${inputValue}
+
+Requirements:
+1. Each object MUST have a unique numeric 'id' field
+2. All values must be realistic and contextually appropriate
+3. Dates should be in ISO format
+4. Numbers should be reasonable for their context
+5. Return ONLY the JSON array with no additional text or formatting
+
+Response Format:
+[
+  {
+    "id": number,
+    ... (other fields based on requirements)
+  }
+]
+`;
+}
+
+async function processAIResponse(response: any, requestData: GenerationRequest) {
+    const text = await response.text();
+
+    // Clean the response text
+    const cleanedText = text
+        .replace(/```json|```/g, '')
+        .trim()
+        .replace(/(\r\n|\n|\r)/gm, '')
+        .replace(/^(?!\[).*?\[/, '[')
+        .replace(/\].*$/, ']');
+
+    try {
+        const parsedData = JSON.parse(cleanedText);
+
+        if (!Array.isArray(parsedData)) {
+            throw new Error('Response is not an array');
+        }
+
+        // Validate each object has required fields
+        parsedData.forEach((item, index) => {
+            if (typeof item !== 'object' || item === null) {
+                throw new Error(`Item at index ${index} is not an object`);
+            }
+            if (!('id' in item)) {
+                throw new Error(`Item at index ${index} is missing required 'id' field`);
+            }
+        });
+
+        // Ensure exact count of objects
+        if (parsedData.length !== requestData.objectsCount) {
+            throw new Error(`Expected ${requestData.objectsCount} objects, got ${parsedData.length}`);
+        }
+
+        return parsedData;
+
+    } catch (error) {
+        throw new Error(`Failed to process AI response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 }
