@@ -6,7 +6,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Copy, Database, Share } from "lucide-react";
+import { Copy, Database, ScanEye, Share } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,6 +32,8 @@ import { Separator } from "@/components/ui/separator";
 
 import { Id } from "@/convex/_generated/dataModel";
 import { Hint } from "./Hint";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { atomDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface DataViewProps {
   data: any;
@@ -81,6 +83,7 @@ fetchData()
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button size="xs" variant="secondary">
+          <ScanEye className="w-4 h-4 mr-1" />
           View data
         </Button>
       </DialogTrigger>
@@ -186,7 +189,7 @@ fetchData()
                 </Button>
               </div>
               <div className="flex-grow rounded-md bg-black p-4 overflow-hidden">
-                <pre className="h-full text-sm text-muted-foreground overflow-auto">
+                {/* <pre className="h-full text-sm text-muted-foreground overflow-auto">
                   <code className="whitespace-pre text-md">
                     <JSONPretty
                       id="json-pretty"
@@ -202,7 +205,20 @@ fetchData()
                       }}
                     />
                   </code>
-                </pre>
+                </pre> */}
+                <SyntaxHighlighter
+                  language="javascript"
+                  style={atomDark}
+                  customStyle={{
+                    borderRadius: "0px",
+                    margin: 0,
+                    padding: "1rem",
+                    fontSize: "0.875rem",
+                    lineHeight: "1.5",
+                  }}
+                >
+                  {fetchCodeSnippet}
+                </SyntaxHighlighter>
               </div>
             </div>
           </TabsContent>

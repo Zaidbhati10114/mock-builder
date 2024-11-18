@@ -24,8 +24,9 @@ interface FormProps {
 }
 
 const schema = z.object({
-  inputData: z.string().nonempty({ message: "Input Data is required" }),
+  prompt: z.string().nonempty({ message: "Input Data is required" }),
   resourceName: z.string().optional(),
+  objectsCount: z.number().default(5),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -62,55 +63,16 @@ export default function JsonGeneratorForm({ id }: FormProps) {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      inputData: "",
+      prompt: "",
       resourceName: "",
+      objectsCount: 10,
     },
   });
 
   const resourceName = watch("resourceName");
 
-  const generateJson = async (prompt: string): Promise<any> => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    abortControllerRef.current = new AbortController();
-
-    try {
-      const response = await fetch("/api/testopen", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-        signal: abortControllerRef.current.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      const data = await response.json();
-
-      // Validate that we received an array
-      if (!Array.isArray(data)) {
-        throw new Error("Invalid response format: expected an array");
-      }
-
-      // Validate that each item has an id
-      if (data.some((item) => !item.id)) {
-        throw new Error("Invalid data structure: missing id in some items");
-      }
-
-      return data;
-    } catch (error: any) {
-      if (error.name === "AbortError") {
-        throw new Error("Request cancelled");
-      }
-      throw error;
-    }
-  };
-
   const validateJsonStructure = (data: any) => {
-    if (!Array.isArray(data) || data.length !== 10) {
+    if (!Array.isArray(data)) {
       return false;
     }
     return data.every((item: any) => item.id && item.title && item.description);
@@ -170,8 +132,23 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     setIsEditable(false);
 
     try {
-      const result = await generateJson(data.inputData);
-      setJsonData(result);
+      const response = await fetch("/api/testopen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: data.prompt,
+          objectsCount: data.objectsCount,
+          model: "explorer", // Default model
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate JSON");
+      }
+
+      const result = await response.json();
+      setJsonData(result.data);
       setIsEditable(true);
       toast.success("JSON data generated successfully");
       await reduceJsonCount({ clerkId: user?.user?.id! });
@@ -185,7 +162,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
   };
 
   const handleClick = (title: string) => {
-    setValue("inputData", title);
+    setValue("prompt", title);
   };
 
   const resetForm = () => {
@@ -204,13 +181,6 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     }
   };
 
-  // useEffect(() => {
-  //   if (textareaRef.current) {
-  //     textareaRef.current.style.height = "auto";
-  //     textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-  //   }
-  // }, [jsonData]);
-
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -224,18 +194,16 @@ export default function JsonGeneratorForm({ id }: FormProps) {
       <div className="w-full md:w-1/2 p-3 py-4">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-4">
-            <Label htmlFor="inputData">Input Data</Label>
+            <Label htmlFor="prompt">Input Data</Label>
             <Input
-              id="inputData"
-              {...register("inputData")}
+              id="prompt"
+              {...register("prompt")}
               placeholder="Enter what kind of JSON data you need"
               className="mt-1 block w-full"
               disabled={loading}
             />
-            {errors.inputData && (
-              <p className="text-red-600 text-sm">
-                {errors.inputData?.message}
-              </p>
+            {errors.prompt && (
+              <p className="text-red-600 text-sm">{errors.prompt?.message}</p>
             )}
 
             <Label htmlFor="resourceName">Resource Name</Label>

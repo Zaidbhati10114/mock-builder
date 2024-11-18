@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Id } from "@/convex/_generated/dataModel";
-import { FileCode2, CopyIcon } from "lucide-react";
+import { FileCode2, CopyIcon, EyeOffIcon, EyeIcon, Trash2 } from "lucide-react";
 import { DataViewer } from "./DataViewer";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -112,10 +112,16 @@ export const ResourceDataCard = ({
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <DataViewer id={id} data={data} name={title} live={live} />
           <Button variant="secondary" size={"xs"} onClick={handleToggle}>
-            {live ? "Make Private" : "Make Public"}
+            {live ? (
+              <EyeOffIcon className="w-6 h-6" />
+            ) : (
+              <EyeIcon className="w-4 h-4 mr-1" />
+            )}
+            {live ? "Make Private" : "Make Live"}
           </Button>
           {}
           <Button variant="destructive" size={"xs"} onClick={handleDelete}>
+            <Trash2 className="w-4 h-4 mr-1" />
             Delete
           </Button>
         </div>
