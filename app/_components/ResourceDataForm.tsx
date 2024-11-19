@@ -11,13 +11,15 @@ import { Label } from "@/components/ui/label";
 import { Row } from "@/components/ui/row";
 import { Copy, RefreshCw } from "lucide-react";
 import { Loader } from "./Loader";
-import { toast } from "sonner";
+import { toast as sonnerToast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/clerk-react";
 import { useIsSubscribed } from "@/lib/useUserLimitstore";
 import { ConvexError } from "convex/values";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+
+import { useToast } from "@/hooks/use-toast";
 
 interface FormProps {
   id: string;
@@ -44,9 +46,10 @@ export default function JsonGeneratorForm({ id }: FormProps) {
   const { MAX_RESOURCES, user: userDetails } = useIsSubscribed();
   const router = useRouter();
   const abortControllerRef = useRef<AbortController | null>(null);
-
+  const { toast } = useToast();
   const [jsonData, setJsonData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isEditable, setIsEditable] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -84,30 +87,50 @@ export default function JsonGeneratorForm({ id }: FormProps) {
       if (validateJsonStructure(parsed)) {
         setJsonData(parsed);
       } else {
-        toast.error("Invalid JSON structure");
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Something went wrong.",
+          description: "There was a problem with your request.",
+        });
       }
     } catch (error) {
-      toast.error("Invalid JSON format");
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "Invalid JSON format.",
+      });
     }
   };
 
   const validateAndSaveData = async () => {
     if (!resourceName) {
-      toast.error("Resource Name is required to save the data");
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "Resource Name is required to save the data",
+      });
       return;
     }
 
     if (!jsonData || (Array.isArray(jsonData) && jsonData.length === 0)) {
-      toast.error("No data to save");
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "No Data to save",
+      });
       return;
     }
 
     if (userDetails?.resourceCount! >= MAX_RESOURCES) {
-      toast.error("You have reached the maximum number of resources");
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "You have reached the maximum number of resources",
+      });
       return;
     }
 
-    setLoading(true);
+    setIsSaving(true);
     try {
       await createResource({
         projectId: id,
@@ -115,20 +138,24 @@ export default function JsonGeneratorForm({ id }: FormProps) {
         data: jsonData,
       });
       router.push(`/dashboard/projects/${id}/resources`);
-      toast.success("Data saved successfully");
+      sonnerToast.success("Data saved successfully");
     } catch (error) {
       const errorMessage =
         error instanceof ConvexError
           ? (error.data as string)
           : "Failed to save data";
-      toast.error(errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: errorMessage,
+      });
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
-    setLoading(true);
+    setIsGenerating(true);
     setIsEditable(false);
 
     try {
@@ -150,14 +177,19 @@ export default function JsonGeneratorForm({ id }: FormProps) {
       const result = await response.json();
       setJsonData(result.data);
       setIsEditable(true);
-      toast.success("JSON data generated successfully");
+      sonnerToast.success("JSON data generated successfully");
       await reduceJsonCount({ clerkId: user?.user?.id! });
     } catch (error: any) {
       console.error("Generation error:", error);
-      toast.error(error.message || "Failed to generate JSON");
+
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: error.message || "Failed to generate JSON",
+      });
       setJsonData(null);
     } finally {
-      setLoading(false);
+      setIsGenerating(false);
     }
   };
 
@@ -177,7 +209,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
   const copyToClipboard = () => {
     if (jsonData) {
       navigator.clipboard.writeText(JSON.stringify(jsonData, null, 2));
-      toast.success("JSON copied to clipboard");
+      sonnerToast.success("JSON copied to clipboard");
     }
   };
 
@@ -200,7 +232,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
               {...register("prompt")}
               placeholder="Enter what kind of JSON data you need"
               className="mt-1 block w-full"
-              disabled={loading}
+              disabled={isGenerating || isSaving}
             />
             {errors.prompt && (
               <p className="text-red-600 text-sm">{errors.prompt?.message}</p>
@@ -212,7 +244,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
               {...register("resourceName")}
               placeholder="Enter resource name"
               className="mt-1 block w-full"
-              disabled={loading}
+              disabled={isGenerating || isSaving}
             />
 
             <Row className="flex-wrap gap-2 justify-start items-center my-2 w-full">
@@ -223,34 +255,50 @@ export default function JsonGeneratorForm({ id }: FormProps) {
                   size="sm"
                   onClick={() => handleClick(item.websiteTitle)}
                   variant="outline"
-                  disabled={loading}
+                  disabled={isGenerating || isSaving}
                 >
                   {item.websiteTitle}
                 </Button>
               ))}
             </Row>
           </div>
-
-          <div className="flex space-x-2">
-            <Button type="submit" variant="secondary" disabled={loading}>
-              {loading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-              {loading ? "Generating..." : "Generate"}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={validateAndSaveData}
-              disabled={
-                loading || !jsonData || !validateJsonStructure(jsonData)
-              }
-            >
-              Save
-            </Button>
-
-            <Button variant="secondary" onClick={resetForm} disabled={loading}>
-              Reset
-            </Button>
-          </div>
         </form>
+
+        {/* Save button moved outside the form */}
+        <div className="flex space-x-2 mt-6">
+          <Button
+            onClick={handleSubmit(onSubmit)}
+            variant="secondary"
+            disabled={isGenerating || isSaving}
+          >
+            {isGenerating && (
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            {isGenerating ? "Generating..." : "Generated"}
+          </Button>
+
+          <Button
+            variant="secondary"
+            onClick={validateAndSaveData}
+            disabled={
+              isGenerating ||
+              isSaving ||
+              !jsonData ||
+              !validateJsonStructure(jsonData)
+            }
+          >
+            {isSaving ? "Saving..." : "Save"}
+          </Button>
+
+          <Button
+            variant="secondary"
+            onClick={resetForm}
+            type="button"
+            disabled={isGenerating || isSaving}
+          >
+            Reset
+          </Button>
+        </div>
       </div>
 
       <div className="w-full md:w-1/2 relative">
@@ -258,20 +306,20 @@ export default function JsonGeneratorForm({ id }: FormProps) {
         <div className="relative mt-2">
           <Textarea
             ref={textareaRef}
-            className="font-mono h-[70vh] resize-none overflow-y-auto"
+            className="font-mono h-[70vh] resize-none overflow-y-auto scrollbar-hide"
             id="jsonOutput"
             value={jsonData ? JSON.stringify(jsonData, null, 2) : ""}
             onChange={handleJsonChange}
             readOnly={!isEditable}
             placeholder={
-              loading
+              isGenerating
                 ? "Generating..."
                 : jsonData
                   ? "Generated JSON will appear here"
                   : "No data generated yet"
             }
           />
-          {loading && (
+          {(isGenerating || isSaving) && (
             <div className="absolute inset-0 flex items-center justify-center bg-opacity-75">
               <Loader />
             </div>
@@ -288,7 +336,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
             size="icon"
             className="h-6 w-6"
             title="Copy JSON"
-            disabled={!jsonData}
+            disabled={!jsonData || isGenerating || isSaving}
           >
             <Copy className="h-4 w-4" />
           </Button>

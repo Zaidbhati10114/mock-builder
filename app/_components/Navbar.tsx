@@ -1,3 +1,4 @@
+"use client";
 import Link from "next/link";
 
 import MaxWidthWrapper from "./MaxWidthWrapper";
@@ -6,10 +7,16 @@ import { useUser } from "@clerk/clerk-react";
 import { ArrowRight, FileJson } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileNavLanding from "./mobile-nav-landing";
+import { useEffect, useState } from "react";
 
 const Navbar = () => {
   const user = useUser();
-  console.log(user.isLoaded);
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) return null;
 
   return (
     <nav className="sticky h-14 inset-x-0 top-0 z-30 w-full border-b border-gray-200 bg-white/75 backdrop-blur-lg transition-all">

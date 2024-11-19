@@ -10,7 +10,6 @@ import { PromptOutputSwitcher } from "./_components/Example";
 import { useUser } from "@clerk/clerk-react";
 import Pricing from "./_components/Pricing";
 import Footer from "./_components/Footer";
-import { useIsSubscribed } from "@/lib/useUserLimitstore";
 
 export default function Home() {
   const user = useUser();
