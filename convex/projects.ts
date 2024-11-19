@@ -77,7 +77,7 @@ export const getProject = query({
     handler: async (ctx, args) => {
         const project = await ctx.db.get(args.id);
         if (!project) {
-            redirect("/dashboard/empty");
+            return null;
         }
         return project;
     },

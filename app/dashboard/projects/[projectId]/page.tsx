@@ -1,12 +1,36 @@
 "use client";
 import BreadcrumbPageWrapper from "@/app/_components/BreaccrumbPageWrapper";
 import ResourceCard from "@/app/_components/ResourceCard";
+import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/clerk-react";
 import { useQuery } from "convex/react";
-import { Braces, FileJson } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { Braces, FileJson, AlertTriangle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import React from "react";
+
+const ProjectNotFoundCard = () => {
+  const router = useRouter();
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] bg-red-50 p-8 rounded-lg text-center mt-10">
+      <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
+      <h2 className="text-2xl font-bold text-red-700 mb-4">
+        Project Not Found
+      </h2>
+      <p className="text-red-600 mb-6">
+        The project you are trying to access has been deleted or no longer
+        exists.
+      </p>
+      <Button
+        onClick={() => router.push("/dashboard/projects")}
+        className="bg-red-500 hover:bg-red-600 text-white"
+      >
+        Create New Project
+      </Button>
+    </div>
+  );
+};
 
 const ProjectIdPage = ({
   params,
@@ -14,11 +38,19 @@ const ProjectIdPage = ({
   params: { projectId: Id<"projects"> };
 }) => {
   const { projectId } = params;
-  const [openModal, setOpenModal] = useState(false);
+  const router = useRouter();
   const user = useUser();
+
   const user_info = useQuery(api?.users.getUserById, {
     clerkId: user?.user?.id!,
   });
+
+  const project = useQuery(api.projects.getProject, { id: projectId });
+
+  // If project is not found, render the not found card
+  if (project === null) {
+    return <ProjectNotFoundCard />;
+  }
 
   const breadcrumbs = [
     { href: "/dashboard/projects", label: "Projects" },
