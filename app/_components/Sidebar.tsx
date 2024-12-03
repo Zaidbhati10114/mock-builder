@@ -11,6 +11,7 @@ import ProgressBar from "./ProgressBar";
 import JsonProgressBar from "./JsonProgressBar";
 import { Badge } from "@/components/ui/badge";
 import { useIsSubscribed } from "@/lib/useUserLimitstore";
+import { Separator } from "@/components/ui/separator";
 
 export default function Sidebar() {
   const { user: userdetails, MAX_PROJECTS } = useIsSubscribed();
