@@ -3,7 +3,7 @@ import { GithubIcon } from "lucide-react";
 
 export default function AboutPage() {
   return (
-    <div className="fixed min-h-screen bg-background p-6 md:p-8 lg:p-12">
+    <div className="min-h-screen bg-background p-6 md:p-8 lg:p-12">
       <div className="mx-auto max-w-4xl space-y-8">
         {/* Header Section */}
         <div className="space-y-4">
