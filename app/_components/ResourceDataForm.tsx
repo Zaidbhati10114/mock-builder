@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Row } from "@/components/ui/row";
-import { Copy, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw, Terminal } from "lucide-react";
 import { Loader } from "./Loader";
 import { toast as sonnerToast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -20,6 +20,8 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Headsup from "./Headups";
 
 interface FormProps {
   id: string;
@@ -298,6 +300,9 @@ export default function JsonGeneratorForm({ id }: FormProps) {
           >
             Reset
           </Button>
+        </div>
+        <div className="space-y-2 mt-4">
+          <Headsup />
         </div>
       </div>
 
