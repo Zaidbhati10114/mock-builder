@@ -28,7 +28,10 @@ const formSchema = z.object({
   model: z.string().min(1, "Model is required"),
   resources: z.string().min(1, "Resources is required"),
   resourceName: z.string().min(1, "Resource name is required"),
-  objectsCount: z.number().min(1, "Objects count must be at least 1"),
+  objectsCount: z
+    .number()
+    .min(1, { message: "Objects count must be at least 1" }) // Prevent negative values
+    .default(5),
 });
 
 interface FormProps {
@@ -127,31 +130,31 @@ export default function JSONGenerator({ id }: FormProps) {
     }
   };
 
-  const fallbackCopyTextToClipboard = (text: string) => {
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    Object.assign(textArea.style, {
-      position: "fixed",
-      top: "0",
-      left: "0",
-      opacity: "0",
-    });
+  // const fallbackCopyTextToClipboard = (text: string) => {
+  //   const textArea = document.createElement("textarea");
+  //   textArea.value = text;
+  //   Object.assign(textArea.style, {
+  //     position: "fixed",
+  //     top: "0",
+  //     left: "0",
+  //     opacity: "0",
+  //   });
 
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
+  //   document.body.appendChild(textArea);
+  //   textArea.focus();
+  //   textArea.select();
 
-    try {
-      document.execCommand("copy")
-        ? toast.success("Data copied to clipboard!")
-        : toast.error("Failed to copy data. Please try again.");
-    } catch (err) {
-      console.error("Fallback copy failed:", err);
-      toast.error("Failed to copy data. Please try again.");
-    }
+  //   try {
+  //     document.execCommand("copy")
+  //       ? toast.success("Data copied to clipboard!")
+  //       : toast.error("Failed to copy data. Please try again.");
+  //   } catch (err) {
+  //     console.error("Fallback copy failed:", err);
+  //     toast.error("Failed to copy data. Please try again.");
+  //   }
 
-    document.body.removeChild(textArea);
-  };
+  //   document.body.removeChild(textArea);
+  // };
 
   // In JSONGenerator component, modify the onSubmit function:
 

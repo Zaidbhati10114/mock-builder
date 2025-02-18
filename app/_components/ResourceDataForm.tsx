@@ -1,5 +1,11 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -22,6 +28,7 @@ import { api } from "@/convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Headsup from "./Headups";
+import { generateStructuredData } from "../actions/gemini";
 
 interface FormProps {
   id: string;
@@ -30,7 +37,10 @@ interface FormProps {
 const schema = z.object({
   prompt: z.string().nonempty({ message: "Input Data is required" }),
   resourceName: z.string().optional(),
-  objectsCount: z.number().default(5),
+  objectsCount: z
+    .number()
+    .min(1, { message: "Objects count must be at least 1" }) // Prevent negative values
+    .default(5),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -74,7 +84,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     },
   });
 
-  const resourceName = watch("resourceName");
+  const resourceName = useMemo(() => watch("resourceName"), [watch]);
 
   const validateJsonStructure = (data: any) => {
     if (!Array.isArray(data)) {
@@ -156,44 +166,41 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     }
   };
 
-  const onSubmit: SubmitHandler<FormData> = async (data) => {
-    setIsGenerating(true);
-    setIsEditable(false);
+  const onSubmit: SubmitHandler<FormData> = useCallback(
+    async (data) => {
+      setIsGenerating(true);
+      setIsEditable(false);
 
-    try {
-      const response = await fetch("/api/testopen", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      try {
+        const result = await generateStructuredData({
           prompt: data.prompt,
           objectsCount: data.objectsCount,
-          model: "explorer", // Default model
-        }),
-      });
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate JSON");
+        if (result.status === "error") {
+          throw new Error(result.error || "Failed to generate JSON");
+        }
+
+        setJsonData(result.data);
+        setIsEditable(true);
+        sonnerToast.success("JSON data generated successfully");
+
+        if (user?.user?.id) {
+          await reduceJsonCount({ clerkId: user.user.id });
+        }
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Something went wrong.",
+          description: error.message || "Failed to generate JSON",
+        });
+        setJsonData(null);
+      } finally {
+        setIsGenerating(false);
       }
-
-      const result = await response.json();
-      setJsonData(result.data);
-      setIsEditable(true);
-      sonnerToast.success("JSON data generated successfully");
-      await reduceJsonCount({ clerkId: user?.user?.id! });
-    } catch (error: any) {
-      console.error("Generation error:", error);
-
-      toast({
-        variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description: error.message || "Failed to generate JSON",
-      });
-      setJsonData(null);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+    },
+    [reduceJsonCount, toast, user?.user?.id]
+  );
 
   const handleClick = (title: string) => {
     setValue("prompt", title);
@@ -276,7 +283,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
             {isGenerating && (
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
             )}
-            {isGenerating ? "Generating..." : "Generated"}
+            {isGenerating ? "Generating..." : "Generate"}
           </Button>
 
           <Button
