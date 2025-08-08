@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { Bird, Copy, Loader2, Rabbit, Save } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +47,18 @@ interface FormValues {
   objectsCount: number;
 }
 
+// Progressive loading messages
+const LOADING_MESSAGES = [
+  { time: 0, message: "Generating..." },
+  { time: 4000, message: "Please wait, it's loading..." },
+  { time: 8000, message: "AI model is busy, processing your request..." },
+  { time: 12000, message: "Complex request detected, still working..." },
+  { time: 16000, message: "Almost there, finalizing the data..." },
+  { time: 20000, message: "Thank you for your patience, processing..." },
+  { time: 25000, message: "High server load detected, please wait..." },
+  { time: 30000, message: "Request is taking longer than expected..." },
+];
+
 export default function JSONGenerator({ id }: FormProps) {
   const user = useUser();
   const router = useRouter();
@@ -60,6 +72,11 @@ export default function JSONGenerator({ id }: FormProps) {
   const [isCopying, setIsCopying] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState("Generating...");
+
+  // Progressive loading refs
+  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const messageIndexRef = useRef(0);
 
   const {
     control,
@@ -76,6 +93,43 @@ export default function JSONGenerator({ id }: FormProps) {
       objectsCount: 0,
     },
   });
+
+  // Function to start progressive loading messages
+  const startProgressiveLoading = useCallback(() => {
+    messageIndexRef.current = 0;
+    setLoadingMessage(LOADING_MESSAGES[0].message);
+
+    const updateMessage = () => {
+      messageIndexRef.current += 1;
+      if (messageIndexRef.current < LOADING_MESSAGES.length) {
+        const nextMessage = LOADING_MESSAGES[messageIndexRef.current];
+        setLoadingMessage(nextMessage.message);
+
+        // Calculate time until next message
+        const currentTime =
+          LOADING_MESSAGES[messageIndexRef.current - 1]?.time || 0;
+        const nextTime = nextMessage.time;
+        const delay = nextTime - currentTime;
+
+        loadingTimerRef.current = setTimeout(updateMessage, delay);
+      }
+    };
+
+    // Start the first timer (4 seconds for the second message)
+    loadingTimerRef.current = setTimeout(
+      updateMessage,
+      LOADING_MESSAGES[1].time
+    );
+  }, []);
+
+  // Function to stop progressive loading messages
+  const stopProgressiveLoading = useCallback(() => {
+    if (loadingTimerRef.current) {
+      clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
+    }
+    messageIndexRef.current = 0;
+  }, []);
 
   const handleSave = async () => {
     if (!generatedData.length) {
@@ -161,6 +215,7 @@ export default function JSONGenerator({ id }: FormProps) {
   const onSubmit = async (data: FormValues) => {
     setIsLoading(true);
     setError(null);
+    startProgressiveLoading();
 
     try {
       const selectedFields = optionsData[data.resources].fields;
@@ -191,6 +246,7 @@ export default function JSONGenerator({ id }: FormProps) {
 
       setGeneratedData(result.message);
       await reduceJsonCount({ clerkId: user?.user?.id! });
+      toast.success("JSON data generated successfully");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to generate data";
@@ -198,9 +254,12 @@ export default function JSONGenerator({ id }: FormProps) {
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
+      stopProgressiveLoading();
     }
   };
+
   const handleReset = () => {
+    stopProgressiveLoading();
     reset({
       model: "",
       resources: "",
@@ -216,6 +275,13 @@ export default function JSONGenerator({ id }: FormProps) {
     setError(null);
     onSubmit(getValues());
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopProgressiveLoading();
+    };
+  }, [stopProgressiveLoading]);
 
   return (
     <div className="w-full max-w-6xl mx-auto p-4">
@@ -418,8 +484,11 @@ export default function JSONGenerator({ id }: FormProps) {
           <CardContent>
             <div className="relative min-h-[500px] max-h-[calc(100vh-300px)] overflow-auto rounded-md bg-muted/50 p-4">
               {isLoading ? (
-                <div className="flex h-full items-center justify-center">
+                <div className="flex h-full items-center justify-center flex-col space-y-3">
                   <Loader2 className="h-8 w-8 animate-spin" />
+                  <p className="text-sm text-gray-600 text-center animate-pulse">
+                    {loadingMessage}
+                  </p>
                 </div>
               ) : error ? (
                 <div className="space-y-4">
@@ -454,14 +523,20 @@ export default function JSONGenerator({ id }: FormProps) {
                     </Button>
                   )}
                   <div className="space-y-4">
-                    {generatedData.map((data, index) => (
-                      <pre
-                        key={index}
-                        className="whitespace-pre-wrap break-words text-sm"
-                      >
-                        {JSON.stringify(data, null, 2)}
-                      </pre>
-                    ))}
+                    {generatedData.length === 0 ? (
+                      <div className="flex h-full items-center justify-center text-muted-foreground">
+                        <p>Generated JSON data will appear here...</p>
+                      </div>
+                    ) : (
+                      generatedData.map((data, index) => (
+                        <pre
+                          key={index}
+                          className="whitespace-pre-wrap break-words text-sm"
+                        >
+                          {JSON.stringify(data, null, 2)}
+                        </pre>
+                      ))
+                    )}
                   </div>
                 </>
               )}

@@ -9,6 +9,7 @@ import Navbar from "./_components/Navbar";
 import { constructMetadata } from "../lib/utils";
 import Script from "next/script";
 import { Toaster } from "@/components/ui/toaster";
+import ServiceWorkerRegister from "./sw-regsiter";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,6 +29,7 @@ export default function RootLayout({
         data-website-id="f3c9bb7f-3445-481a-82f0-3ed7259a95b1"
       />
       <body suppressHydrationWarning className={cn(inter.className)}>
+        <ServiceWorkerRegister />
         <ConvexClerkProvider>
           <ThemeProvider>
             {children}

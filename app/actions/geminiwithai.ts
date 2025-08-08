@@ -23,7 +23,7 @@ export async function generateJSONActionWithData(request: unknown) {
     try {
         const genAI = initializeAI();
         const validatedData = requestSchema.parse(request);
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         const structuredPrompt = `
 Generate a JSON array containing exactly ${validatedData.objectsCount} items based on this request: ${validatedData.inputValue}

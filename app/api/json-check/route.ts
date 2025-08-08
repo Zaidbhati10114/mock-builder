@@ -86,11 +86,11 @@ export async function POST(req: NextRequest) {
         const result = await chatSession.sendMessage(content);
         const textResponse = await result.response.text();
 
-        console.log('Raw text response:', textResponse);
+        // console.log('Raw text response:', textResponse);
 
         const cleanedResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
 
-        console.log('Cleaned response:', cleanedResponse);
+        //console.log('Cleaned response:', cleanedResponse);
 
         let parsedResponse;
         try {

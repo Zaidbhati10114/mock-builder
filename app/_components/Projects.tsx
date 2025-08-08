@@ -35,7 +35,7 @@ const Projects = () => {
   ];
 
   const projects = useQuery(api?.projects?.getProjects, { clerkId: user?.id! });
-  console.log("projects", projects);
+  //console.log("projects", projects);
   //const projects: any = [];
 
   return (

@@ -53,6 +53,18 @@ const EASY_SELECTIONS = [
   { websiteTitle: "5 most popular social media networks" },
 ] as const;
 
+// Progressive loading messages
+const LOADING_MESSAGES = [
+  { time: 0, message: "Generating..." },
+  { time: 4000, message: "Please wait, it's loading..." },
+  { time: 8000, message: "AI model is busy, processing your request..." },
+  { time: 12000, message: "Complex request detected, still working..." },
+  { time: 16000, message: "Almost there, finalizing the data..." },
+  { time: 20000, message: "Thank you for your patience, processing..." },
+  { time: 25000, message: "High server load detected, please wait..." },
+  { time: 30000, message: "Request is taking longer than expected..." },
+];
+
 export default function JsonGeneratorForm({ id }: FormProps) {
   const user = useUser();
   const { MAX_RESOURCES, user: userDetails } = useIsSubscribed();
@@ -63,7 +75,10 @@ export default function JsonGeneratorForm({ id }: FormProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditable, setIsEditable] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Generating...");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const messageIndexRef = useRef(0);
 
   const createResource = useMutation(api.resources.createResource);
   const reduceJsonCount = useMutation(api.resources.reduceJsonGenerationCount);
@@ -85,6 +100,43 @@ export default function JsonGeneratorForm({ id }: FormProps) {
   });
 
   const resourceName = useMemo(() => watch("resourceName"), [watch]);
+
+  // Function to start progressive loading messages
+  const startProgressiveLoading = useCallback(() => {
+    messageIndexRef.current = 0;
+    setLoadingMessage(LOADING_MESSAGES[0].message);
+
+    const updateMessage = () => {
+      messageIndexRef.current += 1;
+      if (messageIndexRef.current < LOADING_MESSAGES.length) {
+        const nextMessage = LOADING_MESSAGES[messageIndexRef.current];
+        setLoadingMessage(nextMessage.message);
+
+        // Calculate time until next message
+        const currentTime =
+          LOADING_MESSAGES[messageIndexRef.current - 1]?.time || 0;
+        const nextTime = nextMessage.time;
+        const delay = nextTime - currentTime;
+
+        loadingTimerRef.current = setTimeout(updateMessage, delay);
+      }
+    };
+
+    // Start the first timer (4 seconds for the second message)
+    loadingTimerRef.current = setTimeout(
+      updateMessage,
+      LOADING_MESSAGES[1].time
+    );
+  }, []);
+
+  // Function to stop progressive loading messages
+  const stopProgressiveLoading = useCallback(() => {
+    if (loadingTimerRef.current) {
+      clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
+    }
+    messageIndexRef.current = 0;
+  }, []);
 
   const validateJsonStructure = (data: any) => {
     if (!Array.isArray(data)) {
@@ -168,8 +220,12 @@ export default function JsonGeneratorForm({ id }: FormProps) {
 
   const onSubmit: SubmitHandler<FormData> = useCallback(
     async (data) => {
+      if (data.objectsCount > 1) {
+        setJsonData(null);
+      }
       setIsGenerating(true);
       setIsEditable(false);
+      startProgressiveLoading();
 
       try {
         const result = await generateStructuredData({
@@ -197,9 +253,16 @@ export default function JsonGeneratorForm({ id }: FormProps) {
         setJsonData(null);
       } finally {
         setIsGenerating(false);
+        stopProgressiveLoading();
       }
     },
-    [reduceJsonCount, toast, user?.user?.id]
+    [
+      reduceJsonCount,
+      toast,
+      user?.user?.id,
+      startProgressiveLoading,
+      stopProgressiveLoading,
+    ]
   );
 
   const handleClick = (title: string) => {
@@ -210,6 +273,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
+    stopProgressiveLoading();
     reset();
     setJsonData(null);
     setIsEditable(false);
@@ -227,8 +291,9 @@ export default function JsonGeneratorForm({ id }: FormProps) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      stopProgressiveLoading();
     };
-  }, []);
+  }, [stopProgressiveLoading]);
 
   return (
     <div className="flex flex-col md:flex-row space-y-8 md:space-y-0 md:space-x-6">
@@ -325,7 +390,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
             readOnly={!isEditable}
             placeholder={
               isGenerating
-                ? "Generating..."
+                ? loadingMessage
                 : jsonData
                   ? "Generated JSON will appear here"
                   : "No data generated yet"
@@ -333,7 +398,14 @@ export default function JsonGeneratorForm({ id }: FormProps) {
           />
           {(isGenerating || isSaving) && (
             <div className="absolute inset-0 flex items-center justify-center bg-opacity-75">
-              <Loader />
+              <div className="flex flex-col items-center space-y-3">
+                <Loader />
+                {isGenerating && (
+                  <p className="text-sm text-gray-600 text-center px-4 animate-pulse">
+                    {loadingMessage}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>

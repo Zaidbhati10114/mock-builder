@@ -100,7 +100,7 @@ export const getResourceByID = query({
 
 
             if (!resource) {
-                console.log("Resource not found");
+                //console.log("Resource not found");
                 return null
             }
 

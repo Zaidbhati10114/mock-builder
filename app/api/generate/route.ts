@@ -22,10 +22,10 @@ export async function POST(request: Request) {
     try {
         const genAI = initializeAI();
         const body = await request.json();
-        console.log('Received request body:', body);
+        //console.log('Received request body:', body);
 
         const validatedData = requestSchema.parse(body);
-        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         // Construct a more specific prompt that enforces JSON structure
         const structuredPrompt = `
@@ -48,7 +48,7 @@ Example format:
 
 Return ONLY the JSON array, no other text.`;
 
-        console.log('Sending prompt:', structuredPrompt);
+        //console.log('Sending prompt:', structuredPrompt);
 
         const result = await model.generateContent(structuredPrompt);
         const response = await result.response;

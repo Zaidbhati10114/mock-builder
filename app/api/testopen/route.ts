@@ -101,7 +101,7 @@ export async function POST(request: Request) {
         const body = await request.json();
         const validatedData = requestSchema.parse(body);
 
-        const modelName = validatedData.model === 'genesis' ? 'gemini-pro' : 'gemini-pro';
+        const modelName = validatedData.model === 'genesis' ? 'gemini-2.5-flash' : 'gemini-2.5-flash';
         const model = genAI.getGenerativeModel({ model: modelName });
 
         const prompt = generateStructuredPrompt(validatedData.prompt);
