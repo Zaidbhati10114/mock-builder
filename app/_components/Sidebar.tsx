@@ -1,94 +1,72 @@
 "use client";
+
 import Link from "next/link";
-import { FileJson } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { redirect, usePathname } from "next/navigation";
-import { useUser } from "@clerk/clerk-react";
+import { useUser } from "@clerk/nextjs";
 import { primaryNavItems } from "@/lib";
 
 import ProgressBar from "./ProgressBar";
 import JsonProgressBar from "./JsonProgressBar";
 import { Badge } from "@/components/ui/badge";
 import { useIsSubscribed } from "@/lib/useUserLimitstore";
-import { Separator } from "@/components/ui/separator";
 
 export default function Sidebar() {
   const { user: userdetails, MAX_PROJECTS } = useIsSubscribed();
-  //console.log(isPro);
-  const user = useUser();
+  const { user } = useUser();
   if (!user) redirect("/sign-in");
-  const [navItems, setNavItems] = useState([...primaryNavItems]);
+
+  const [navItems] = useState([...primaryNavItems]);
   const pathname = usePathname();
 
   const isActive = (link: string) => {
-    if (link === "/dashboard") {
-      return pathname === link;
-    }
+    if (link === "/dashboard") return pathname === link;
     return pathname.startsWith(link);
   };
 
   return (
-    <div className="hidden h-screen border-r bg-muted/40 md:block">
-      <div className="flex h-full flex-col">
-        <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <FileJson className="h-6 w-6" />
-            <span className="">Mock Builder</span>
-          </Link>
-
-          {/* {!(<UserButton />) && <Loader />} */}
-          {userdetails?.isPro ? (
-            <div className="rounded-full">
-              <Badge className="mt-5 ml-1" variant={"outline"}>
-                Pro
-              </Badge>
-            </div>
-          ) : (
-            <div className="rounded-full">
-              <Badge className="mt-5 ml-1" variant={"outline"}>
-                Free
-              </Badge>
-            </div>
-          )}
+    <div className="w-64 bg-gradient-to-b from-slate-900 to-slate-800 text-white p-6 h-full shadow-2xl relative hidden md:block">
+      {/* Logo + Title */}
+      <div className="flex items-center space-x-3 mb-10">
+        <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+          <Sparkles className="w-6 h-6" />
         </div>
-        <nav className="flex-1 overflow-y-auto px-1 text-sm font-medium lg:px-4">
-          {navItems.map(({ name, icon, link }, idx) => (
-            <div key={idx}>
-              <div className={cn("flex items-center lg:w-full")}>
-                <div
-                  className={cn(
-                    "flex items-center text-left lg:gap-3 rounded-lg py-2 transition-all hover:text-primary justify-between w-full",
-                    isActive(link)
-                      ? "active rounded-lg bg-primary/10 text-primary transition-all hover:text-primary"
-                      : "text-foreground"
-                  )}
-                >
-                  <Link
-                    key={idx}
-                    href={link}
-                    className={cn(
-                      "flex items-center text-left gap-5 px-2 rounded-xl transition-all hover:text-primary w-full"
-                    )}
-                  >
-                    <div className="flex gap-4 items-center w-full">
-                      <div className="flex gap-2 items-center">
-                        <p className="flex text-base text-left">{icon}</p>
-                        <p className="text-lg">{name}</p>
-                      </div>
-                    </div>
-                  </Link>
-                </div>
+        <div>
+          <h1 className="text-xl font-bold">Mock Builder</h1>
+          <p className="text-slate-400 text-sm">Smart Data Generation</p>
+        </div>
+        <div className="ml-auto">
+          <Badge variant="outline">{userdetails?.isPro ? "Pro" : "Free"}</Badge>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="space-y-2">
+        {navItems.map(({ name, icon, link }, idx) => (
+          <Link key={idx} href={link}>
+            <div
+              className={cn(
+                "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group",
+                isActive(link)
+                  ? "bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg"
+                  : "hover:bg-slate-700/50"
+              )}
+            >
+              <div className="flex items-center space-x-3">
+                <span className="w-5 h-5">{icon}</span>
+                <span className="font-medium">{name}</span>
               </div>
             </div>
-          ))}
-        </nav>
-        <div className="p-4">
-          <ProgressBar max_projects={MAX_PROJECTS || 2} />
-        </div>
-        <div className="p-4">
-          <JsonProgressBar />
-        </div>
+          </Link>
+        ))}
+      </nav>
+
+      {/* Progress Bars */}
+      <div className="absolute bottom-4 left-0 right-0 px-4 space-y-4">
+        <ProgressBar max_projects={MAX_PROJECTS || 2} />
+        <JsonProgressBar />
       </div>
     </div>
   );

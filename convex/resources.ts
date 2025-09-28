@@ -85,7 +85,6 @@ export const reduceJsonGenerationCount = mutation({
 
     }
 })
-
 export const getResourceByID = query({
     args: {
         resourceId: v.id("resources"),
@@ -97,14 +96,17 @@ export const getResourceByID = query({
                 .filter(q => q.eq(q.field("_id"), resourceId))
                 .first();
 
-
-
             if (!resource) {
-                //console.log("Resource not found");
-                return null
+                return null;
             }
 
-            return resource || null;
+            // Also fetch the user data
+            const user = await ctx.db.get(resource.userId);
+
+            return {
+                ...resource,
+                user: user // Include user data in the response
+            };
         } catch (error) {
             console.error('Error occurred while fetching the resource by ID:', error);
             throw new Error("Failed to fetch resource");
@@ -190,58 +192,149 @@ export const deleteResource = mutation({
     }
 });
 
+export const checkAndIncrementApiUsage = mutation({
+    args: {
+        userId: v.id("users"),
+        resourceId: v.id("resources"),
+        userAgent: v.string(),
+        ipAddress: v.string(),
+    },
+    handler: async (ctx, { userId, resourceId, userAgent, ipAddress }) => {
+        const user = await ctx.db.get(userId);
+        if (!user) return false;
+
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${now.getMonth() + 1}`;
+        const resetDate = user.apiRequestsResetDate;
+
+        // Handle existing users who don't have these fields yet
+        // OR reset counter if it's a new month
+        if (!resetDate || resetDate !== currentMonth || user.apiRequestsThisMonth === undefined) {
+            await ctx.db.patch(userId, {
+                apiRequestsThisMonth: 0,
+                apiRequestsResetDate: currentMonth
+            });
+            // Update the user object for the current function
+            user.apiRequestsThisMonth = 0;
+        }
+
+        // Check limits (handle undefined gracefully)
+        const limit = user.isPro ? 50000 : 1000;
+        const currentUsage = user.apiRequestsThisMonth || 0; // Default to 0 if undefined
+
+        if (currentUsage >= limit) {
+            return false;
+        }
+
+        // Rest of your logic...
+        await ctx.db.patch(userId, {
+            apiRequestsThisMonth: currentUsage + 1
+        });
+
+        await ctx.db.insert("apiRequests", {
+            resourceId,
+            userId,
+            timestamp: Date.now(),
+            ipAddress,
+            userAgent,
+            responseStatus: 200
+        });
+
+        return {
+            success: true,
+            remaining: limit - (currentUsage + 1)
+        };
+    }
+});
+
+
+
 export const getResourceByIdHttp = httpAction(async (ctx: GenericActionCtx<any>, request: Request) => {
     const url = new URL(request.url);
     const resourceId = url.searchParams.get("resourceID");
 
-
     if (!resourceId) {
         return new Response(JSON.stringify({ error: 'resourceId is required' }), {
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             status: 400
         });
     }
 
     try {
-        const resource = await ctx.runQuery(api.resources.getResourceByID, { resourceId: resourceId as Id<"resources"> });
+        const resourceWithUser = await ctx.runQuery(api.resources.getResourceByID, {
+            resourceId: resourceId as Id<"resources">
+        });
 
-        if (!resource) {
+        if (!resourceWithUser) {
             return new Response(JSON.stringify({ error: 'Resource not found' }), {
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 status: 404
             });
         }
 
-        if (resource?.live === false) {
+        if (!resourceWithUser.live) {
             return new Response(JSON.stringify({ error: 'Resource is not live' }), {
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 status: 400
             });
         }
 
-        return new Response(JSON.stringify(resource.data), {
+        if (!resourceWithUser.user) {
+            return new Response(JSON.stringify({ error: 'User not found' }), {
+                headers: { 'Content-Type': 'application/json' },
+                status: 500
+            });
+        }
+
+        const user = resourceWithUser.user;
+
+        // Check rate limits before serving data
+        const isWithinLimit = await ctx.runMutation(api.resources.checkAndIncrementApiUsage, {
+            userId: resourceWithUser.userId,
+            resourceId: resourceId as Id<"resources">,
+            userAgent: request.headers.get('user-agent') || '',
+            ipAddress: getClientIP(request)
+        });
+
+        if (!isWithinLimit) {
+            return new Response(JSON.stringify({
+                error: 'API rate limit exceeded',
+                message: user.isPro
+                    ? 'You have exceeded your monthly limit of 50,000 requests. Please upgrade or wait for next month.'
+                    : 'You have exceeded your monthly limit of 1,000 requests. Please upgrade to Pro for higher limits.'
+            }), {
+                headers: { 'Content-Type': 'application/json' },
+                status: 429
+            });
+        }
+
+        return new Response(JSON.stringify(resourceWithUser.data), {
             headers: {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
-                "Access-Control-Allow-Methods": "GET, POST",
-                "Access-Control-Allow-Headers": "Content-Type",
+                'Access-Control-Allow-Methods': 'GET, POST',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'X-RateLimit-Remaining': isWithinLimit.remaining?.toString() || '0',
+                'X-RateLimit-Limit': user.isPro ? '50000' : '1000',
             },
             status: 200
         });
+
     } catch (error: any) {
         console.error('Error fetching resource:', error);
-        return new Response(JSON.stringify({ error: 'Server error', details: error.message }), {
-            headers: {
-                'Content-Type': 'application/json'
-            },
+        return new Response(JSON.stringify({ error: 'Server error' }), {
+            headers: { 'Content-Type': 'application/json' },
             status: 500
         });
     }
 });
+
+
+
+// Helper function to get client IP
+function getClientIP(request: Request): string {
+    return request.headers.get('x-forwarded-for')?.split(',')[0] ||
+        request.headers.get('x-real-ip') ||
+        'unknown';
+}
 

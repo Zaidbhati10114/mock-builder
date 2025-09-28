@@ -1,5 +1,4 @@
 "use client";
-
 import React from "react";
 import ProjectCard from "./ProjectCard";
 import { AddProject } from "./AddProjectModal";
@@ -40,31 +39,30 @@ const Projects = () => {
 
   return (
     <>
-      <div className="container p-10 h-full overflow-y-auto scrollbar-hide">
-        {projects ? (
-          <div className="flex flex-col items-center mb-10 w-full gap-10 px-5">
-            <div className="max-w-[730px] flex w-full justify-between items-center">
-              <h3 className="">All Projects</h3>
-              <AddProject />
-            </div>
-            <ul className="flex w-full flex-col gap-6 max-w-[730px]">
-              {projects.map(
-                ({
-                  _id: id,
-                  projectName,
-                  _creationTime: createdAt,
-                }: projectType) => (
-                  <ProjectCard
-                    key={id}
-                    id={id}
-                    title={projectName}
-                    createdAt={convertCreatedAt(createdAt)}
-                  />
-                )
-              )}
-            </ul>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-slate-900">All Projects</h1>
+          <AddProject />
+        </div>
+
+        <div className="w-full">
+          <div className="flex flex-col gap-6">
+            {projects?.map(
+              ({
+                _id: id,
+                projectName,
+                _creationTime: createdAt,
+              }: projectType) => (
+                <ProjectCard
+                  key={id}
+                  id={id}
+                  title={projectName}
+                  createdAt={convertCreatedAt(createdAt)}
+                />
+              )
+            )}
           </div>
-        ) : null}
+        </div>
 
         {projects === undefined && <Loader />}
         {projects?.length === 0 && (

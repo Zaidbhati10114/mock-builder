@@ -27,7 +27,6 @@ const handleClerkWebhook = httpAction(async (ctx, request) => {
                 // User already exists, return an error response
                 return new Response("User with this email already exists", { status: 409 });
             }
-
             await ctx.runMutation(internal.users.createUser, {
                 clerkId: event.data.id,
                 email: event.data.email_addresses[0].email_address,
@@ -37,7 +36,9 @@ const handleClerkWebhook = httpAction(async (ctx, request) => {
                 projectCount: 0,
                 resourceCount: 0,
                 jsonGenerationCount: 1000,
-
+                // Initialize API tracking fields
+                apiRequestsThisMonth: 0,
+                apiRequestsResetDate: `${new Date().getFullYear()}-${new Date().getMonth() + 1}`,
             });
             break;
         case "user.updated":

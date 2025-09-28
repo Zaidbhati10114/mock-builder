@@ -27,7 +27,7 @@ const ResourceCard = ({
   route,
 }: ResourceCardTwoProps) => {
   return (
-    <div className="relative flex h-auto w-full max-w-[500px] shrink-0 items-center justify-center rounded-md border border-dashed p-4 sm:h-[450px] sm:w-[500px]">
+    <div className="bg-white rounded-2xl p-4 shadow border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div className="absolute top-2 left-2">
         <Badge>{badgeText}</Badge>
       </div>

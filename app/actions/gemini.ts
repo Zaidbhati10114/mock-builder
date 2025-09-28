@@ -4,7 +4,13 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2048,
+    }
+});
 
 // Input validation schema
 const requestSchema = z.object({
@@ -13,86 +19,160 @@ const requestSchema = z.object({
     objectsCount: z.number().min(1).max(100).default(10),
 });
 
-// Generate structured prompt for Gemini
-function generateStructuredPrompt(prompt: string): string {
+// Generate structured prompt for Gemini with dynamic count
+function generateStructuredPrompt(prompt: string, count: number): string {
     return `
-Generate exactly 10 JSON objects based on the following requirements:
+Generate exactly ${count} JSON objects based on the following requirements:
 ${prompt}
 
 Requirements:
-1. Each object MUST have a unique numeric 'id' field.
+1. Each object MUST have a unique numeric 'id' field (starting from 1).
 2. Include 'title' and 'description' fields.
-3. Dates should be in ISO format.
-4. Numbers should be reasonable for their context.
-5. Return ONLY the JSON array with no additional text.
+3. Keep descriptions concise (1-2 sentences max).
+4. Dates should be in ISO format if needed.
+5. Numbers should be reasonable for their context.
+6. Return ONLY the JSON array with no additional text, markdown, or explanations.
 
 Response Format:
 [
   {
-    "id": number,
-    "title": string,
-    "description": string
+    "id": 1,
+    "title": "Example Title",
+    "description": "Example description here."
   }
 ]
-  `;
+`;
 }
 
-// Retry mechanism for generating content
-async function generateWithRetry(prompt: string, maxRetries = 3) {
-    let lastError;
+// Timeout wrapper for promises
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
+        ),
+    ]);
+}
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            const result = await model.generateContent(prompt);
-            return result.response.text();
-        } catch (error) {
-            lastError = error;
-            if (attempt === maxRetries) break;
-            await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+// Simplified generation with timeout
+async function generateWithTimeout(prompt: string) {
+    try {
+        const generatePromise = model.generateContent(prompt);
+        // Set timeout to 8 seconds to stay under Vercel's 10-second limit
+        const result = await withTimeout(generatePromise, 8000);
+        return result.response.text();
+    } catch (error: any) {
+        console.error("Generation error:", error);
+        if (error.message === 'Request timeout') {
+            throw new Error("AI generation timed out. Please try with a smaller object count or simpler prompt.");
         }
+        throw new Error(`AI generation failed: ${error.message || 'Unknown error'}`);
     }
-
-    throw lastError || new Error("Failed to generate content after multiple attempts");
 }
 
 // Process and clean AI response
 function processAIResponse(responseText: string) {
-    const cleanedText = responseText
-        .replace(/```json|```/g, "")
-        .trim()
-        .replace(/^(?!\[).*?\[/, "[")
-        .replace(/\].*$/, "]");
-
     try {
+        // Clean the response text
+        let cleanedText = responseText.trim();
+
+        // Remove markdown code blocks if present
+        cleanedText = cleanedText.replace(/```json\s*|\s*```/g, "");
+
+        // Find JSON array in the response
+        const jsonMatch = cleanedText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            cleanedText = jsonMatch[0];
+        }
+
         const parsedData = JSON.parse(cleanedText);
+
         if (!Array.isArray(parsedData)) {
             throw new Error("Response is not an array");
         }
+
+        // Validate each item has required fields
         parsedData.forEach((item, index) => {
-            if (!item.id || !item.title || !item.description) {
-                throw new Error(`Item at index ${index} is missing required fields`);
+            if (typeof item !== 'object' || item === null) {
+                throw new Error(`Item at index ${index} is not an object`);
+            }
+            if (!item.hasOwnProperty('id') || !item.hasOwnProperty('title') || !item.hasOwnProperty('description')) {
+                throw new Error(`Item at index ${index} is missing required fields (id, title, or description)`);
+            }
+            // Ensure id is a number
+            if (typeof item.id !== 'number') {
+                item.id = index + 1;
             }
         });
+
         return parsedData;
-    } catch (error) {
-        throw new Error(`Failed to process AI response: ${error}`);
+    } catch (error: any) {
+        console.error("Processing error:", error);
+        throw new Error(`Failed to process AI response: ${error.message}`);
     }
 }
 
-// Next.js server action for AI generation
+// Main server action with comprehensive error handling
 export const generateStructuredData = async (input: unknown) => {
     try {
-        const validatedData = requestSchema.parse(input);
-        const prompt = generateStructuredPrompt(validatedData.prompt);
-        const responseText = await generateWithRetry(prompt);
-        const processedData = processAIResponse(responseText);
+        console.log("Starting generation with input:", input);
 
-        return { status: "success", data: processedData };
-    } catch (error) {
+        // Validate input
+        const validatedData = requestSchema.parse(input);
+        console.log("Validated data:", validatedData);
+
+        // Generate prompt
+        const prompt = generateStructuredPrompt(
+            validatedData.prompt,
+            validatedData.objectsCount
+        );
+
+        // Generate content with timeout
+        const responseText = await generateWithTimeout(prompt);
+        console.log("AI response received, length:", responseText.length);
+
+        // Process the response
+        const processedData = processAIResponse(responseText);
+        console.log("Data processed successfully, items:", processedData.length);
+
+        return {
+            status: "success",
+            data: processedData,
+            message: `Generated ${processedData.length} items successfully`
+        };
+
+    } catch (error: any) {
         console.error("Generation error:", error);
+
+        // Handle validation errors
         if (error instanceof z.ZodError) {
-            return { status: "error", error: "Validation error", details: error.errors };
+            return {
+                status: "error",
+                error: "Invalid input data",
+                details: error.errors.map(e => e.message).join(", ")
+            };
         }
-        return { status: "error", error: "Internal server error" };
+
+        // Handle timeout errors
+        if (error.message?.includes('timeout')) {
+            return {
+                status: "error",
+                error: "Request timed out. Try reducing the number of objects or simplifying your prompt."
+            };
+        }
+
+        // Handle API key errors
+        if (error.message?.includes('API key')) {
+            return {
+                status: "error",
+                error: "AI service configuration error. Please contact support."
+            };
+        }
+
+        // Generic error handling
+        return {
+            status: "error",
+            error: error.message || "Failed to generate data. Please try again."
+        };
     }
 };

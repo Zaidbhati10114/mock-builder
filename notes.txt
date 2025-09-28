@@ -15,3 +15,73 @@
                 
 
                 i have an app which generates mock data saves them in further generates an ur l ,when fetched the url gets the data generated i want t build an landing page for that need good animations and small showcase of my app func through animations or anything interesting suggest some ideas also libraries or approach to achieve them .It is an web fyi 
+                "use client";
+
+import React, { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Loader } from "./Loader";
+import Image from "next/image";
+import { useUser } from "@clerk/clerk-react";
+import { useRouter } from "next/navigation";
+import { projectType } from "@/types";
+import { AddProject } from "./AddProjectModal";
+import ProjectCard from "./ProjectCard"; // ✅ import your reusable card
+
+const Projects = () => {
+  const { user } = useUser();
+  const router = useRouter();
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+
+  if (!user) {
+    router.push("/sign-in");
+  }
+
+  const projects = useQuery(api?.projects?.getProjects, { clerkId: user?.id! });
+
+  return (
+    <div className="container p-10 h-full overflow-y-auto scrollbar-hide">
+      {projects ? (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-slate-900">All Projects</h1>
+            <AddProject />
+          </div>
+
+          {/* Projects grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {projects.map(
+              ({ _id: id, projectName, _creationTime }: projectType) => (
+                <ProjectCard
+                  key={id}
+                  id={id}
+                  title={projectName}
+                  createdAt={new Date(_creationTime).toLocaleDateString()}
+                />
+              )
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Loader */}
+      {projects === undefined && <Loader />}
+
+      {/* Empty state */}
+      {projects?.length === 0 && (
+        <div className="flex w-full items-center justify-center">
+          <Image
+            src="/no-data.svg"
+            alt="Document"
+            width={580}
+            height={580}
+            className="mx-auto"
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Projects;

@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useUser } from "@clerk/clerk-react";
@@ -27,7 +27,7 @@ import { ConvexError } from "convex/values";
 
 const FormSchema = z.object({
   name: z.string().min(2, {
-    message: "Username must be at least 2 characters.",
+    message: "Project name must be at least 2 characters.",
   }),
 });
 
@@ -41,12 +41,76 @@ export function AddProject() {
   });
   const createProject = useMutation(api.projects.createProject);
 
+  // react-hook-form
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
       name: "",
     },
   });
+
+  // local state for debounced name
+  const [debouncedName, setDebouncedName] = useState("");
+  const typingTimeout = useRef<number | null>(null);
+  //const shouldCheck = debouncedName && debouncedName.length >= 2;
+
+  // call checkNameAvailability query with debouncedName
+  const checkResult = useQuery(
+    // Use debouncedName in args only when it exists; when empty the query will return quickly
+    api.projects.checkNameAvailability,
+    { projectName: debouncedName }
+  );
+
+  // Watch the form name field to debounce
+  const nameValue = form.watch("name");
+
+  useEffect(() => {
+    if (typingTimeout.current) {
+      window.clearTimeout(typingTimeout.current);
+    }
+
+    // reset debounced value if name is empty
+    if (!nameValue || !nameValue.trim()) {
+      setDebouncedName("");
+      // clear manual errors if any
+      form.clearErrors("name");
+      return;
+    }
+
+    // debounce 400ms
+    typingTimeout.current = window.setTimeout(() => {
+      setDebouncedName(nameValue.trim());
+    }, 400);
+
+    return () => {
+      if (typingTimeout.current) window.clearTimeout(typingTimeout.current);
+    };
+  }, [nameValue, form]);
+
+  // When checkResult updates, show/hide validation error
+  useEffect(() => {
+    if (!debouncedName) return;
+
+    if (!checkResult) return;
+
+    // checkResult can be undefined while loading; handle that
+    // if query returns an object: { available, reason, suggestion }
+    if (checkResult.available === false) {
+      // set validation error on the name field
+      form.setError("name", {
+        type: "manual",
+        message:
+          checkResult?.reason === "not_authenticated"
+            ? "Sign in to check name"
+            : checkResult?.reason === "user_not_found"
+              ? "User not found"
+              : "Project name already exists",
+      });
+    } else if (checkResult.available === true) {
+      // clear any manual errors
+      form.clearErrors("name");
+    }
+  }, [checkResult, debouncedName, form]);
 
   async function onSubmit(data: z.infer<typeof FormSchema>) {
     try {
@@ -64,20 +128,25 @@ export function AddProject() {
     } catch (error) {
       const errorMessage =
         error instanceof ConvexError ? (error.data as string) : "";
-      toast.error(errorMessage);
+      // If server says "Project name already exists", map to form error
+      if (errorMessage === "Project name already exists") {
+        form.setError("name", { type: "server", message: errorMessage });
+      } else {
+        toast.error(errorMessage || "Unable to create project");
+      }
       setIsLoading(false);
-      form.reset();
     }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant={"outline"} className="">
+        <Button className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl flex items-center space-x-2 hover:shadow-lg transition-all duration-200">
           <Plus className="mr-2 h-4 w-4" />
           Add Project
         </Button>
       </DialogTrigger>
+
       <DialogContent>
         {!user_info?.isPro && user_info?.projectCount! >= MAX_PROJECTS ? (
           <div>
@@ -98,12 +167,47 @@ export function AddProject() {
                   <FormItem className="px-2 py-2">
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Project Name" {...field} />
+                      <Input
+                        placeholder="Project Name"
+                        {...field}
+                        aria-invalid={!!form.formState.errors.name}
+                      />
                     </FormControl>
                     <FormDescription>
                       This is your project display name.
                     </FormDescription>
                     <FormMessage />
+                    {/* Optional inline hint from checkResult suggestion */}
+                    {debouncedName &&
+                    checkResult &&
+                    checkResult.available &&
+                    checkResult.suggestion ? (
+                      <div className="text-sm text-green-600 mt-1">
+                        Available — suggestion:{" "}
+                        <code>{checkResult.suggestion}</code>
+                      </div>
+                    ) : null}
+                    {debouncedName &&
+                    checkResult &&
+                    checkResult.available === false &&
+                    checkResult.suggestion ? (
+                      <div className="text-sm text-yellow-700 mt-1">
+                        Name taken. Try{" "}
+                        <button
+                          type="button"
+                          className="underline"
+                          onClick={() => {
+                            // set suggested name into the form
+                            form.setValue(
+                              "name",
+                              checkResult.suggestion || field.value
+                            );
+                          }}
+                        >
+                          {checkResult.suggestion}
+                        </button>
+                      </div>
+                    ) : null}
                   </FormItem>
                 )}
               />

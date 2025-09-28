@@ -36,10 +36,10 @@ interface FormProps {
 
 const schema = z.object({
   prompt: z.string().nonempty({ message: "Input Data is required" }),
-  resourceName: z.string().optional(),
+  resourceName: z.string().optional(), // keep optional
   objectsCount: z
     .number()
-    .min(1, { message: "Objects count must be at least 1" }) // Prevent negative values
+    .min(1, { message: "Objects count must be at least 1" })
     .default(5),
 });
 
@@ -99,7 +99,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     },
   });
 
-  const resourceName = useMemo(() => watch("resourceName"), [watch]);
+  const resourceName = watch("resourceName");
 
   // Function to start progressive loading messages
   const startProgressiveLoading = useCallback(() => {
@@ -167,7 +167,9 @@ export default function JsonGeneratorForm({ id }: FormProps) {
   };
 
   const validateAndSaveData = async () => {
-    if (!resourceName) {
+    const name = resourceName?.trim();
+
+    if (!name) {
       toast({
         variant: "destructive",
         title: "Uh oh! Something went wrong.",
@@ -218,6 +220,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     }
   };
 
+  // Updated onSubmit function with better error handling
   const onSubmit: SubmitHandler<FormData> = useCallback(
     async (data) => {
       if (data.objectsCount > 1) {
@@ -228,28 +231,61 @@ export default function JsonGeneratorForm({ id }: FormProps) {
       startProgressiveLoading();
 
       try {
+        console.log("Submitting form with data:", data);
+
+        // Call the server action
         const result = await generateStructuredData({
           prompt: data.prompt,
           objectsCount: data.objectsCount,
         });
 
-        if (result.status === "error") {
-          throw new Error(result.error || "Failed to generate JSON");
+        console.log("Server action result:", result);
+
+        // Check if result exists and has the expected structure
+        if (!result) {
+          throw new Error("No response received from server");
         }
 
-        setJsonData(result.data);
-        setIsEditable(true);
-        sonnerToast.success("JSON data generated successfully");
+        if (result.status === "error") {
+          throw new Error(result.error || "Server returned an error");
+        }
 
-        if (user?.user?.id) {
-          await reduceJsonCount({ clerkId: user.user.id });
+        if (result.status === "success" && result.data) {
+          setJsonData(result.data);
+          setIsEditable(true);
+          sonnerToast.success(
+            result.error || "JSON data generated successfully"
+          );
+
+          // Reduce the user's JSON count
+          if (user?.user?.id) {
+            try {
+              await reduceJsonCount({ clerkId: user.user.id });
+            } catch (countError) {
+              console.warn("Failed to reduce JSON count:", countError);
+              // Don't fail the entire operation for this
+            }
+          }
+        } else {
+          throw new Error("Invalid response format from server");
         }
       } catch (error: any) {
+        console.error("Form submission error:", error);
+
+        let errorMessage = "Failed to generate JSON";
+
+        if (error.message) {
+          errorMessage = error.message;
+        } else if (typeof error === "string") {
+          errorMessage = error;
+        }
+
         toast({
           variant: "destructive",
-          title: "Uh oh! Something went wrong.",
-          description: error.message || "Failed to generate JSON",
+          title: "Generation Failed",
+          description: errorMessage,
         });
+
         setJsonData(null);
       } finally {
         setIsGenerating(false);
@@ -320,6 +356,11 @@ export default function JsonGeneratorForm({ id }: FormProps) {
               className="mt-1 block w-full"
               disabled={isGenerating || isSaving}
             />
+            {/* {errors.resourceName && (
+              <p className="text-red-600 text-sm">
+                {errors.resourceName.message}
+              </p>
+            )} */}
 
             <Row className="flex-wrap gap-2 justify-start items-center my-2 w-full">
               {EASY_SELECTIONS.map((item) => (

@@ -1,3 +1,4 @@
+
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query, action, internalQuery, internalAction } from "./_generated/server";
 import { Stripe } from "stripe"
@@ -15,22 +16,24 @@ export const createUser = internalMutation({
         projectCount: v.number(),
         resourceCount: v.number(),
         jsonGenerationCount: v.optional(v.number()),
-
-
-    }, handler: async (ctx, args) => {
+        apiRequestsThisMonth: v.optional(v.number()),
+        apiRequestsResetDate: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
         await ctx.db.insert('users', {
             clerkId: args.clerkId,
             email: args.email,
             name: args.name,
             imageUrl: args.imageUrl,
-            isPro: false,
-            projectCount: 0,
-            resourceCount: 0,
-            jsonGenerationCount: 1000,
-        })
-
+            isPro: args.isPro, // Use the argument, not hardcoded false
+            projectCount: args.projectCount, // Use the argument, not hardcoded 0
+            resourceCount: args.resourceCount, // Use the argument, not hardcoded 0
+            jsonGenerationCount: args.jsonGenerationCount || 1000, // Use argument or default
+            apiRequestsThisMonth: args.apiRequestsThisMonth, // Use the argument
+            apiRequestsResetDate: args.apiRequestsResetDate, // Use the argument
+        });
     }
-})
+});
 
 export const updateUser = internalMutation({
     args: {
@@ -233,8 +236,3 @@ export const updateSubscriptionStatus = internalMutation({
         });
     },
 });
-
-
-
-
-

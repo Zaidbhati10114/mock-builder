@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "./_components/Navbar";
 import MaxWidthWrapper from "./_components/MaxWidthWrapper";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Github } from "lucide-react";
 import { PromptOutputSwitcher } from "./_components/Example";
 import { useUser } from "@clerk/clerk-react";
 import Pricing from "./_components/Pricing";
@@ -13,7 +13,7 @@ import Footer from "./_components/Footer";
 
 export default function Home() {
   const user = useUser();
-  const router = useRouter();
+  // const router = useRouter();
 
   return (
     <>
@@ -43,6 +43,20 @@ export default function Home() {
           {user.isSignedIn ? "Dashboard" : "Get started"}{" "}
           <ArrowRight className="ml-2 h-5 w-5 transform transition-transform duration-300 ease-in-out group-hover:translate-x-1.5" />
         </Link>
+
+        {/* Developer Credit */}
+        <div className="mt-8 flex items-center space-x-2 text-sm text-zinc-600">
+          <span>Developed by</span>
+          <Link
+            href="https://github.com/Zaidbhati10114"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <Github className="h-4 w-4" />
+            <span className="font-medium">Zaid Bhati</span>
+          </Link>
+        </div>
       </MaxWidthWrapper>
 
       {/* value proposition section */}

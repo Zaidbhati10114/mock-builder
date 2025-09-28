@@ -1,6 +1,74 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { redirect } from "next/navigation";
+
+// small slugify helper (optional, used for suggestion)
+function slugify(name: string) {
+    return name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\- ]+/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/\-+/g, "-")
+        .replace(/^\-|\-$/g, "");
+}
+
+/**
+ * Lightweight availability check for client-side typing UX.
+ * Uses auth identity to find the user, then checks whether a project
+ * with the exact (trimmed) projectName already exists for that user.
+ *
+ * Returns { available: boolean, reason?: string, suggestion?: string }
+ */
+
+
+export const checkNameAvailability = query({
+    args: { projectName: v.string() },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) {
+            return { available: false, reason: "not_authenticated" };
+        }
+
+        const user = await ctx.db.query("users")
+            .filter(q => q.eq(q.field("email"), identity.email))
+            .first();
+
+        if (!user) {
+            return { available: false, reason: "user_not_found" };
+        }
+
+        const trimmed = args.projectName.trim();
+        if (!trimmed) {
+            return { available: false, reason: "empty" };
+        }
+
+        // Try exact-match lookup (fast if you added an index by_user_and_name)
+        const existing = await ctx.db.query("projects")
+            .filter(q => q.eq(q.field("userId"), user._id) && q.eq(q.field("projectName"), trimmed))
+            .first();
+
+        if (!existing) {
+            return { available: true, suggestion: slugify(trimmed) };
+        }
+
+        // Suggest a small suffix (rarely needed; keep the loop short)
+        const base = slugify(trimmed) || "project";
+        let suggestion: string | undefined;
+        for (let i = 1; i <= 5; i++) {
+            const candidateName = `${trimmed}-${i}`;
+            const found = await ctx.db.query("projects")
+                .filter(q => q.eq(q.field("userId"), user._id) && q.eq(q.field("projectName"), candidateName))
+                .first();
+            if (!found) {
+                suggestion = candidateName;
+                break;
+            }
+        }
+
+        return { available: false, reason: "exists", suggestion };
+    },
+});
+
 
 
 export const createProject = mutation({
@@ -20,29 +88,48 @@ export const createProject = mutation({
                 throw new ConvexError("User not found");
             }
 
-            if (!user[0]?.isPro && user[0]?.projectCount! >= 2) {
+            const u = user[0];
+
+            if (!u?.isPro && (u?.projectCount ?? 0) >= 2) {
                 throw new ConvexError("You have reached the maximum number of projects");
             }
 
+            const trimmed = args.projectName.trim();
+            if (!trimmed) {
+                throw new ConvexError("Project name is required");
+            }
+
+            // Authoritative uniqueness check (server-side).
+            // Attempt to find any existing project for this user with the same name.
+            const existing = await ctx.db.query("projects")
+                .filter(q => q.eq(q.field("userId"), u._id) && q.eq(q.field("projectName"), trimmed))
+                .first();
+
+            if (existing) {
+                // Friendly, clear validation error for the client to show
+                throw new ConvexError("Project name already exists");
+            }
+
+            // Insert project
             const projects = await ctx.db.insert("projects", {
-                projectName: args.projectName,
-                userId: user[0]._id,
+                projectName: trimmed,
+                userId: u._id,
             });
 
-            await ctx.db.patch(user[0]._id, {
-                projectCount: user[0].projectCount! + 1
+            // Update projectCount safely
+            await ctx.db.patch(u._id, {
+                projectCount: (u.projectCount ?? 0) + 1,
             });
 
             return projects;
-
-
         } catch (error) {
-            console.error('Error occurred during project creation:', error);
+            // If it's a ConvexError we rethrow; otherwise wrap as generic message
+            if (error instanceof ConvexError) throw error;
+            console.error("Error occurred during project creation:", error);
             throw new ConvexError("Error occurred during project creation");
         }
     },
 });
-
 
 
 export const getProjects = query({

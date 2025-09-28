@@ -82,7 +82,7 @@ fetchData()
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button size="xs" variant="secondary">
+        <Button size="sm" variant="secondary">
           <ScanEye className="w-4 h-4 mr-1" />
           View data
         </Button>
