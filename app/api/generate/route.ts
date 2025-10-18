@@ -1,137 +1,117 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { NextRequest, NextResponse } from "next/server";
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { NextResponse } from 'next/server';
-import { z } from 'zod';
+export const runtime = 'edge'; // Use Edge Runtime
+export const maxDuration = 60; // Pro plan only
 
-const initializeAI = () => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        throw new Error('GEMINI_API_KEY is not configured');
-    }
-    return new GoogleGenerativeAI(apiKey);
-};
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-const requestSchema = z.object({
-    inputValue: z.string().min(1, "Input value is required"),
-    model: z.enum(["genesis", "explorer"]).optional(),
-    resources: z.string().min(1, "Resource type is required"),
-    objectsCount: z.number().min(1).max(100),
-});
+function generatePrompt(prompt: string, count: number): string {
+    return `Generate exactly ${count} JSON objects for: ${prompt}
 
-export async function POST(request: Request) {
+RULES:
+- Each object needs: id (number), title (string), description (string)
+- Start id from 1
+- Keep descriptions under 100 chars
+- Return ONLY JSON array, no markdown
+Example: [{"id":1,"title":"Example","description":"Short text."}]`;
+}
+
+export async function POST(req: NextRequest) {
     try {
-        const genAI = initializeAI();
-        const body = await request.json();
-        //console.log('Received request body:', body);
+        const { prompt, objectsCount = 10 } = await req.json();
 
-        const validatedData = requestSchema.parse(body);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        if (!prompt) {
+            return NextResponse.json(
+                { error: "Prompt is required" },
+                { status: 400 }
+            );
+        }
 
-        // Construct a more specific prompt that enforces JSON structure
-        const structuredPrompt = `
-Generate a JSON array containing exactly ${validatedData.objectsCount} items based on this request: ${validatedData.inputValue}
+        // Limit for free tier
+        if (objectsCount > 15) {
+            return NextResponse.json(
+                { error: "Max 15 items on free tier" },
+                { status: 400 }
+            );
+        }
 
-Important requirements:
-- Response must be ONLY a valid JSON array
-- Each object must have an 'id' field
-- No markdown, no explanations, just the JSON array
-- Must be properly formatted JSON
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: Math.min(2048, objectsCount * 150),
+            }
+        });
 
-Example format:
-[
-  {
-    "id": 1,
-    "name": "Example Name",
-    "email": "example@email.com"
-  }
-]
+        const fullPrompt = generatePrompt(prompt, objectsCount);
 
-Return ONLY the JSON array, no other text.`;
-
-        //console.log('Sending prompt:', structuredPrompt);
-
-        const result = await model.generateContent(structuredPrompt);
-        const response = await result.response;
-        const text = await response.text();
-
-        console.log('Raw AI response:', text);
-
-        // Clean the response to ensure it's valid JSON
-        const cleanedText = text
-            .replace(/```json\n?|\n?```/g, '') // Remove code blocks
-            .replace(/^\s*\n/gm, '') // Remove empty lines
-            .trim();
+        // Set aggressive timeout for free tier
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 9000);
 
         try {
-            // Try to parse the cleaned response
-            const parsedData = JSON.parse(cleanedText);
+            const result = await model.generateContent(fullPrompt);
+            clearTimeout(timeoutId);
 
-            // Validate that it's an array
-            if (!Array.isArray(parsedData)) {
-                throw new Error('Response is not an array');
+            let responseText = result.response.text();
+
+            // Clean response
+            responseText = responseText.trim()
+                .replace(/```(?:json)?\s*/g, "")
+                .replace(/```\s*$/g, "")
+                .replace(/^[^[]*/, "")
+                .replace(/[^\]]*$/, "");
+
+            const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) {
+                throw new Error("No valid JSON found");
             }
 
-            // Validate array length
-            if (parsedData.length !== validatedData.objectsCount) {
-                // If count doesn't match, fix the array
-                const adjustedData = adjustArraySize(parsedData, validatedData.objectsCount);
-                return NextResponse.json({ message: adjustedData, status: 'success' });
+            const parsedData = JSON.parse(jsonMatch[0]);
+
+            if (!Array.isArray(parsedData) || parsedData.length === 0) {
+                throw new Error("Invalid data structure");
             }
 
-            return NextResponse.json({ message: parsedData, status: 'success' });
+            // Validate and fix items
+            const validatedData = parsedData.map((item, index) => ({
+                id: typeof item.id === 'number' ? item.id : index + 1,
+                title: item.title?.toString() || `Item ${index + 1}`,
+                description: item.description?.toString() || "No description",
+                ...item
+            }));
 
-        } catch (parseError) {
-            console.error('Parse error:', parseError);
-
-            // Attempt to fix malformed JSON
-            const fallbackData = generateFallbackData(validatedData.objectsCount);
             return NextResponse.json({
-                message: fallbackData,
-                status: 'success',
-                warning: 'Used fallback data due to parsing error'
+                status: "success",
+                data: validatedData,
+                message: `Generated ${validatedData.length} items`
             });
+
+        } catch (error: any) {
+            clearTimeout(timeoutId);
+
+            if (error.name === 'AbortError') {
+                return NextResponse.json(
+                    {
+                        status: "error",
+                        error: "Request timed out. Try fewer items or simpler prompt."
+                    },
+                    { status: 408 }
+                );
+            }
+            throw error;
         }
 
-    } catch (error) {
-        console.error('Generation error:', error);
+    } catch (error: any) {
+        console.error("Generation error:", error);
 
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({
-                error: 'Validation error',
-                details: error.errors
-            }, { status: 400 });
-        }
-
-        return NextResponse.json({
-            error: error instanceof Error ? error.message : 'Internal server error'
-        }, { status: 500 });
+        return NextResponse.json(
+            {
+                status: "error",
+                error: error.message || "Failed to generate data"
+            },
+            { status: 500 }
+        );
     }
-}
-
-// Helper function to adjust array size if needed
-function adjustArraySize(array: any[], targetSize: number): any[] {
-    if (array.length === targetSize) return array;
-
-    if (array.length < targetSize) {
-        // Add more items
-        const template = array[0] || {};
-        while (array.length < targetSize) {
-            const newItem = { ...template, id: array.length + 1 };
-            array.push(newItem);
-        }
-    } else {
-        // Remove extra items
-        array = array.slice(0, targetSize);
-    }
-
-    return array;
-}
-
-// Helper function to generate fallback data
-function generateFallbackData(count: number): any[] {
-    return Array.from({ length: count }, (_, i) => ({
-        id: i + 1,
-        name: `User ${i + 1}`,
-        email: `user${i + 1}@example.com`
-    }));
 }

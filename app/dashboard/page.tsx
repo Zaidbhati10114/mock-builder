@@ -38,7 +38,7 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 {[
                   {
                     title: "Total Projects",
@@ -91,7 +91,7 @@ const DashboardPage = () => {
                     <p className="text-slate-600 text-sm">{stat.title}</p>
                   </div>
                 ))}
-              </div>
+              </div> */}
 
               <div className="bg-white w-full max-h-full rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-lg border border-slate-100">
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6">

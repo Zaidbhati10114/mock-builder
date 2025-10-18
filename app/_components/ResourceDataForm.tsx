@@ -221,6 +221,87 @@ export default function JsonGeneratorForm({ id }: FormProps) {
   };
 
   // Updated onSubmit function with better error handling
+  // const onSubmit: SubmitHandler<FormData> = useCallback(
+  //   async (data) => {
+  //     if (data.objectsCount > 1) {
+  //       setJsonData(null);
+  //     }
+  //     setIsGenerating(true);
+  //     setIsEditable(false);
+  //     startProgressiveLoading();
+
+  //     try {
+  //       console.log("Submitting form with data:", data);
+
+  //       // Call the server action
+  //       const result = await generateStructuredData({
+  //         prompt: data.prompt,
+  //         objectsCount: data.objectsCount,
+  //       });
+
+  //       console.log("Server action result:", result);
+
+  //       // Check if result exists and has the expected structure
+  //       if (!result) {
+  //         throw new Error("No response received from server");
+  //       }
+
+  //       if (result.status === "error") {
+  //         throw new Error(result.error || "Server returned an error");
+  //       }
+
+  //       if (result.status === "success" && result.data) {
+  //         setJsonData(result.data);
+  //         setIsEditable(true);
+  //         sonnerToast.success(
+  //           result.error || "JSON data generated successfully"
+  //         );
+
+  //         // Reduce the user's JSON count
+  //         if (user?.user?.id) {
+  //           try {
+  //             await reduceJsonCount({ clerkId: user.user.id });
+  //           } catch (countError) {
+  //             console.warn("Failed to reduce JSON count:", countError);
+  //             // Don't fail the entire operation for this
+  //           }
+  //         }
+  //       } else {
+  //         throw new Error("Invalid response format from server");
+  //       }
+  //     } catch (error: any) {
+  //       console.error("Form submission error:", error);
+
+  //       let errorMessage = "Failed to generate JSON";
+
+  //       if (error.message) {
+  //         errorMessage = error.message;
+  //       } else if (typeof error === "string") {
+  //         errorMessage = error;
+  //       }
+
+  //       toast({
+  //         variant: "destructive",
+  //         title: "Generation Failed",
+  //         description: errorMessage,
+  //       });
+
+  //       setJsonData(null);
+  //     } finally {
+  //       setIsGenerating(false);
+  //       stopProgressiveLoading();
+  //     }
+  //   },
+  //   [
+  //     reduceJsonCount,
+  //     toast,
+  //     user?.user?.id,
+  //     startProgressiveLoading,
+  //     stopProgressiveLoading,
+  //   ]
+  // );
+  // Replace your onSubmit function with this:
+
   const onSubmit: SubmitHandler<FormData> = useCallback(
     async (data) => {
       if (data.objectsCount > 1) {
@@ -233,29 +314,29 @@ export default function JsonGeneratorForm({ id }: FormProps) {
       try {
         console.log("Submitting form with data:", data);
 
-        // Call the server action
-        const result = await generateStructuredData({
-          prompt: data.prompt,
-          objectsCount: data.objectsCount,
+        // Call the API route instead of server action
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: data.prompt,
+            objectsCount: data.objectsCount,
+          }),
         });
 
-        console.log("Server action result:", result);
+        const result = await response.json();
+        console.log("API response:", result);
 
-        // Check if result exists and has the expected structure
-        if (!result) {
-          throw new Error("No response received from server");
-        }
-
-        if (result.status === "error") {
+        if (!response.ok || result.status === "error") {
           throw new Error(result.error || "Server returned an error");
         }
 
         if (result.status === "success" && result.data) {
           setJsonData(result.data);
           setIsEditable(true);
-          sonnerToast.success(
-            result.error || "JSON data generated successfully"
-          );
+          sonnerToast.success("JSON data generated successfully");
 
           // Reduce the user's JSON count
           if (user?.user?.id) {
@@ -263,7 +344,6 @@ export default function JsonGeneratorForm({ id }: FormProps) {
               await reduceJsonCount({ clerkId: user.user.id });
             } catch (countError) {
               console.warn("Failed to reduce JSON count:", countError);
-              // Don't fail the entire operation for this
             }
           }
         } else {
