@@ -225,7 +225,7 @@ export default function JSONGenerator({ id }: FormProps) {
 
       const prompt = `Generate ${data.objectsCount} JSON Objects fake data for these ${fieldsList}. Return only JSON objects in a list where every object must contain an id number`;
 
-      const response = await fetch("/api/generate", {
+      const response = await fetch("/api/generatewithdata", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
