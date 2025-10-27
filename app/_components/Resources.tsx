@@ -21,13 +21,13 @@ const Resources = ({ projectId }: ResourceProps) => {
   const resource = useQuery(api.resources.getResources, { projectId });
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 max-w-6xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3 mb-2">
           <h1 className="text-2xl font-bold">All Resources</h1>
         </div>
 
-        <div>
+        <div className="">
           {/* Keep as Link if Create Resource is separate page; style it to match dashboard */}
           <Link href={`/dashboard/projects/${projectId}`}>
             <Button className="inline-flex items-center gap-2">
@@ -38,7 +38,7 @@ const Resources = ({ projectId }: ResourceProps) => {
         </div>
       </div>
 
-      <div className="w-full">
+      <div className="w-full mt-10">
         <ul className="flex flex-col gap-6">
           {resource?.map(
             ({

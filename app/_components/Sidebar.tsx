@@ -27,44 +27,50 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="w-64 bg-gradient-to-b from-slate-900 to-slate-800 text-white p-6 h-full shadow-2xl relative hidden md:block">
-      {/* Logo + Title */}
-      <div className="flex items-center space-x-3 mb-10">
-        <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-          <Sparkles className="w-6 h-6" />
+    <div className="w-64 bg-gradient-to-b from-slate-900 to-slate-800 text-white h-full shadow-2xl flex flex-col">
+      {/* Logo + Title - Fixed at top */}
+      <div className="flex-shrink-0 p-6 pb-4">
+        <div className="flex items-center space-x-3 mb-3">
+          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <h1 className="text-xl font-bold">Mock Builder</h1>
+            <p className="text-slate-400 text-xs">Smart Data Generation</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold">Mock Builder</h1>
-          <p className="text-slate-400 text-sm">Smart Data Generation</p>
-        </div>
-        <div className="ml-auto">
-          <Badge variant="outline">{userdetails?.isPro ? "Pro" : "Free"}</Badge>
+        <div className="w-full px-3 py-1.5 rounded-lg bg-slate-700/50 border border-slate-600 text-center">
+          <span className="text-xs font-medium text-white">
+            {userdetails?.isPro ? "✨ Pro Plan" : "🆓 Free Plan"}
+          </span>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="space-y-2">
-        {navItems.map(({ name, icon, link }, idx) => (
-          <Link key={idx} href={link}>
-            <div
-              className={cn(
-                "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group",
-                isActive(link)
-                  ? "bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg"
-                  : "hover:bg-slate-700/50"
-              )}
-            >
-              <div className="flex items-center space-x-3">
-                <span className="w-5 h-5">{icon}</span>
-                <span className="font-medium">{name}</span>
+      {/* Navigation - Scrollable area */}
+      <nav className="flex-1 px-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+        <div className="space-y-2 py-2">
+          {navItems.map(({ name, icon, link }, idx) => (
+            <Link key={idx} href={link}>
+              <div
+                className={cn(
+                  "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group",
+                  isActive(link)
+                    ? "bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg"
+                    : "hover:bg-slate-700/50"
+                )}
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="w-5 h-5 flex-shrink-0">{icon}</span>
+                  <span className="font-medium text-sm">{name}</span>
+                </div>
               </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          ))}
+        </div>
       </nav>
 
-      {/* Progress Bars */}
-      <div className="absolute bottom-4 left-0 right-0 px-4 space-y-4">
+      {/* Progress Bars - Fixed at bottom */}
+      <div className="flex-shrink-0 p-4 pt-2 space-y-3 border-t border-slate-700/50">
         <ProgressBar max_projects={MAX_PROJECTS || 2} />
         <JsonProgressBar />
       </div>

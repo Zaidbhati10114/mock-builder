@@ -39,13 +39,13 @@ const Projects = () => {
 
   return (
     <>
-      <div className="space-y-6">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 max-w-6xl">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-slate-900">All Projects</h1>
           <AddProject />
         </div>
 
-        <div className="w-full">
+        <div className="w-full mt-10">
           <div className="flex flex-col gap-6">
             {projects?.map(
               ({

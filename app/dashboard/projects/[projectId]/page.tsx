@@ -59,18 +59,18 @@ const ProjectIdPage = ({
 
   return (
     <BreadcrumbPageWrapper breadcrumbs={breadcrumbs} projectId={projectId}>
-      <div className="p-4 mt-10 flex flex-col space-y-4 gap-4 md:flex-row md:justify-center md:space-y-0 md:space-x-4">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 lg:py-12">
         {!user_info?.isPro && user_info?.resourceCount! >= 2 ? (
-          <div>
-            <p className="mb-4">
+          <div className="max-w-2xl mx-auto text-center bg-blue-50 border border-blue-200 rounded-2xl p-8 md:p-10">
+            <p className="text-lg md:text-xl text-gray-700 mb-6">
               Free tier only allows 2 projects. Upgrade to create more!
             </p>
-            <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-base font-semibold">
               Upgrade to Pro
-            </button>
+            </Button>
           </div>
         ) : (
-          <>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8 lg:gap-10 max-w-[1400px] mx-auto">
             <ResourceCard
               route="prompt"
               icon={Braces}
@@ -84,12 +84,12 @@ const ProjectIdPage = ({
               route="with-data"
               icon={FileJson}
               title="Generate JSON Data with Specific Data"
-              description="This tool is designed for pro developers to generate JSON data based on the available parametes on this application."
+              description="This tool is designed for pro developers to generate JSON data based on the available parameters on this application."
               buttonText="Generate JSON Data"
               badgeText="Pro"
               projectId={projectId}
             />
-          </>
+          </div>
         )}
       </div>
     </BreadcrumbPageWrapper>
