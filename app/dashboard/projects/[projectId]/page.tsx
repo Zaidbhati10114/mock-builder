@@ -80,7 +80,7 @@ const ProjectIdPage = ({
               badgeText="Beginner"
               projectId={projectId}
             />
-            <ResourceCard
+            {/* <ResourceCard
               route="with-data"
               icon={FileJson}
               title="Generate JSON Data with Specific Data"
@@ -88,7 +88,7 @@ const ProjectIdPage = ({
               buttonText="Generate JSON Data"
               badgeText="Pro"
               projectId={projectId}
-            />
+            /> */}
           </div>
         )}
       </div>

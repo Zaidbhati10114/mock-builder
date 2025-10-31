@@ -17,7 +17,8 @@ const page = ({ params }: { params: { projectId: Id<"projects"> } }) => {
   return (
     <div>
       <BreadcrumbPageWrapper breadcrumbs={breadcrumbs} projectId={projectId}>
-        <Component id={projectId} />
+        {/* <Component id={projectId} /> */}
+        <h1>In Developement stage</h1>
       </BreadcrumbPageWrapper>
     </div>
   );

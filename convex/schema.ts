@@ -15,6 +15,39 @@ export default defineSchema({
         live: v.boolean(),
     }),
 
+    // NEW: JSON Generation Jobs Table
+    jsonJobs: defineTable({
+        userId: v.id("users"),
+        projectId: v.string(),
+        prompt: v.string(),
+        objectsCount: v.number(),
+        status: v.union(
+            v.literal("queued"),
+            v.literal("processing"),
+            v.literal("completed"),
+            v.literal("failed")
+        ),
+        result: v.optional(v.array(v.any())),
+        error: v.optional(v.string()),
+        createdAt: v.number(),
+        completedAt: v.optional(v.number()),
+        processingTime: v.optional(v.number()), // milliseconds
+        // Optional metadata for advanced generator
+        metadata: v.optional(v.object({
+            model: v.optional(v.string()),
+            resources: v.optional(v.string()),
+            resourceName: v.optional(v.string()),
+            fields: v.optional(v.array(v.object({
+                label: v.string(),
+                type: v.string(),
+            }))),
+        })),
+    })
+        .index("by_user", ["userId"])
+        .index("by_project", ["projectId"])
+        .index("by_status", ["status"])
+        .index("by_user_and_status", ["userId", "status"]),
+
     users: defineTable({
         email: v.string(),
         imageUrl: v.string(),
@@ -26,14 +59,12 @@ export default defineSchema({
         projectCount: v.optional(v.number()),
         resourceCount: v.optional(v.number()),
         jsonGenerationCount: v.optional(v.number()),
-        // NEW FIELDS FOR API TRACKING
         apiRequestsThisMonth: v.optional(v.number()),
-        apiRequestsResetDate: v.optional(v.string()), // Format: "YYYY-M" like "2024-8"
+        apiRequestsResetDate: v.optional(v.string()),
     })
         .index("by_clerk_id", ["clerkId"])
         .index("by_subscriptionId", ["subscriptionId"]),
 
-    // NEW TABLE FOR API REQUEST LOGGING
     apiRequests: defineTable({
         resourceId: v.id("resources"),
         userId: v.id("users"),
@@ -41,19 +72,18 @@ export default defineSchema({
         ipAddress: v.optional(v.string()),
         userAgent: v.optional(v.string()),
         responseStatus: v.number(),
-        responseTime: v.optional(v.number()), // milliseconds
+        responseTime: v.optional(v.number()),
     })
         .index("by_user_id", ["userId"])
         .index("by_resource_id", ["resourceId"])
         .index("by_timestamp", ["timestamp"])
-        .index("by_user_and_timestamp", ["userId", "timestamp"]) // For efficient user analytics
-        .index("by_resource_and_timestamp", ["resourceId", "timestamp"]), // For resource analytics
+        .index("by_user_and_timestamp", ["userId", "timestamp"])
+        .index("by_resource_and_timestamp", ["resourceId", "timestamp"]),
 
-    // OPTIONAL: Daily aggregated stats for better performance on large datasets
     dailyApiStats: defineTable({
         userId: v.id("users"),
         resourceId: v.id("resources"),
-        date: v.string(), // Format: "YYYY-MM-DD"
+        date: v.string(),
         requestCount: v.number(),
         uniqueIPs: v.number(),
         avgResponseTime: v.optional(v.number()),

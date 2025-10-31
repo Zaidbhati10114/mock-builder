@@ -14,7 +14,7 @@ import { z } from "zod";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "@/convex/_generated/api";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 import { optionsData } from "@/utils/optionsData";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ import { useUser } from "@clerk/clerk-react";
 import { ConvexError } from "convex/values";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Id } from "@/convex/_generated/dataModel";
+import { useIsSubscribed } from "@/lib/useUserLimitstore";
 
 const formSchema = z.object({
   model: z.string().min(1, "Model is required"),
@@ -30,7 +32,7 @@ const formSchema = z.object({
   resourceName: z.string().min(1, "Resource name is required"),
   objectsCount: z
     .number()
-    .min(1, { message: "Objects count must be at least 1" }) // Prevent negative values
+    .min(1, { message: "Objects count must be at least 1" })
     .default(5),
 });
 
@@ -47,23 +49,25 @@ interface FormValues {
   objectsCount: number;
 }
 
-// Progressive loading messages
 const LOADING_MESSAGES = [
-  { time: 0, message: "Generating..." },
-  { time: 4000, message: "Please wait, it's loading..." },
-  { time: 8000, message: "AI model is busy, processing your request..." },
-  { time: 12000, message: "Complex request detected, still working..." },
-  { time: 16000, message: "Almost there, finalizing the data..." },
-  { time: 20000, message: "Thank you for your patience, processing..." },
-  { time: 25000, message: "High server load detected, please wait..." },
-  { time: 30000, message: "Request is taking longer than expected..." },
+  { time: 0, message: "Queuing your request..." },
+  { time: 2000, message: "AI is processing..." },
+  { time: 5000, message: "Generating structured data..." },
+  { time: 10000, message: "Almost there..." },
+  { time: 15000, message: "Finalizing results..." },
 ];
 
 export default function JSONGenerator({ id }: FormProps) {
   const user = useUser();
   const router = useRouter();
+  const { user: userDetails } = useIsSubscribed();
+
+  // Convex hooks
   const createResource = useMutation(api.resources.createResource);
-  const reduceJsonCount = useMutation(api.resources.reduceJsonGenerationCount);
+  const createAdvancedJob = useMutation(api.advancedJsonJobs.createAdvancedJob);
+  const generateAdvancedAction = useAction(
+    api.multiModelActions.generateAdvancedJsonWithFallback
+  );
 
   // State management
   const [generatedData, setGeneratedData] = useState<GeneratedData[]>([]);
@@ -73,10 +77,18 @@ export default function JSONGenerator({ id }: FormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState("Generating...");
+  const [currentJobId, setCurrentJobId] = useState<Id<"jsonJobs"> | null>(null);
+  const [useFallback, setUseFallback] = useState(false);
 
   // Progressive loading refs
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const messageIndexRef = useRef(0);
+
+  // Subscribe to job updates (real-time!)
+  const job = useQuery(
+    api.advancedJsonJobs.getAdvancedJob,
+    currentJobId ? { jobId: currentJobId } : "skip"
+  );
 
   const {
     control,
@@ -94,7 +106,39 @@ export default function JSONGenerator({ id }: FormProps) {
     },
   });
 
-  // Function to start progressive loading messages
+  // Handle job status changes (real-time updates!)
+  useEffect(() => {
+    if (!job) return;
+
+    switch (job.status) {
+      case "queued":
+        setLoadingMessage("Request queued, starting soon...");
+        break;
+      case "processing":
+        setLoadingMessage(
+          `AI (${job.model || "Gemini"}) is generating your data...`
+        );
+        break;
+      case "completed":
+        if (job.result) {
+          setGeneratedData(job.result);
+          setIsLoading(false);
+          stopProgressiveLoading();
+          toast.success(
+            `Generated ${job.result.length} ${job.resources || "items"} successfully!`
+          );
+        }
+        break;
+      case "failed":
+        setIsLoading(false);
+        stopProgressiveLoading();
+        setError(job.error || "An error occurred");
+        toast.error(job.error || "Generation failed");
+        setUseFallback(true);
+        break;
+    }
+  }, [job]);
+
   const startProgressiveLoading = useCallback(() => {
     messageIndexRef.current = 0;
     setLoadingMessage(LOADING_MESSAGES[0].message);
@@ -105,7 +149,6 @@ export default function JSONGenerator({ id }: FormProps) {
         const nextMessage = LOADING_MESSAGES[messageIndexRef.current];
         setLoadingMessage(nextMessage.message);
 
-        // Calculate time until next message
         const currentTime =
           LOADING_MESSAGES[messageIndexRef.current - 1]?.time || 0;
         const nextTime = nextMessage.time;
@@ -115,14 +158,12 @@ export default function JSONGenerator({ id }: FormProps) {
       }
     };
 
-    // Start the first timer (4 seconds for the second message)
     loadingTimerRef.current = setTimeout(
       updateMessage,
       LOADING_MESSAGES[1].time
     );
   }, []);
 
-  // Function to stop progressive loading messages
   const stopProgressiveLoading = useCallback(() => {
     if (loadingTimerRef.current) {
       clearTimeout(loadingTimerRef.current);
@@ -147,9 +188,7 @@ export default function JSONGenerator({ id }: FormProps) {
       });
 
       router.push(`/dashboard/projects/${id}/resources`);
-      toast.success(
-        "Resource saved successfully. Please wait for the data to be indexed"
-      );
+      toast.success("Resource saved successfully!");
     } catch (error) {
       const errorMessage =
         error instanceof ConvexError
@@ -170,53 +209,56 @@ export default function JSONGenerator({ id }: FormProps) {
 
     setIsCopying(true);
     try {
-      const textToCopy = generatedData
-        .map((data) => JSON.stringify(data, null, 2))
-        .join("\n\n");
-
+      const textToCopy = JSON.stringify(generatedData, null, 2);
       await navigator.clipboard.writeText(textToCopy);
       toast.success("Data copied to clipboard!");
     } catch (err) {
-      //fallbackCopyTextToClipboard(textToCopy);
       toast.error("Failed to copy data. Please try again.");
     } finally {
       setIsCopying(false);
     }
   };
 
-  // const fallbackCopyTextToClipboard = (text: string) => {
-  //   const textArea = document.createElement("textarea");
-  //   textArea.value = text;
-  //   Object.assign(textArea.style, {
-  //     position: "fixed",
-  //     top: "0",
-  //     left: "0",
-  //     opacity: "0",
-  //   });
+  // Generate with Convex Actions
+  const generateWithConvex = async (data: FormValues) => {
+    try {
+      const selectedFields = optionsData[data.resources].fields;
+      const fieldsList = selectedFields
+        .map((field) => `${field.label}: ${field.type}`)
+        .join(", ");
 
-  //   document.body.appendChild(textArea);
-  //   textArea.focus();
-  //   textArea.select();
+      const prompt = `Generate ${data.objectsCount} JSON Objects fake data for these ${fieldsList}. Return only JSON objects in a list where every object must contain an id number`;
 
-  //   try {
-  //     document.execCommand("copy")
-  //       ? toast.success("Data copied to clipboard!")
-  //       : toast.error("Failed to copy data. Please try again.");
-  //   } catch (err) {
-  //     console.error("Fallback copy failed:", err);
-  //     toast.error("Failed to copy data. Please try again.");
-  //   }
+      // Create job
+      const jobId = await createAdvancedJob({
+        projectId: id,
+        model: data.model,
+        resources: data.resources,
+        resourceName: data.resourceName,
+        objectsCount: data.objectsCount,
+        prompt: prompt,
+        fields: selectedFields,
+      });
 
-  //   document.body.removeChild(textArea);
-  // };
+      setCurrentJobId(jobId);
 
-  // In JSONGenerator component, modify the onSubmit function:
+      // Trigger background action
+      generateAdvancedAction({
+        jobId,
+        prompt,
+        objectsCount: data.objectsCount,
+        model: data.model,
+        userId: userDetails!._id,
+      }).catch((error) => {
+        console.error("Action error:", error);
+      });
+    } catch (error: any) {
+      throw error;
+    }
+  };
 
-  const onSubmit = async (data: FormValues) => {
-    setIsLoading(true);
-    setError(null);
-    startProgressiveLoading();
-
+  // Fallback to API route
+  const generateWithFallback = async (data: FormValues) => {
     try {
       const selectedFields = optionsData[data.resources].fields;
       const fieldsList = selectedFields
@@ -230,9 +272,9 @@ export default function JSONGenerator({ id }: FormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           inputValue: prompt,
-          model: data.model, // Add model
-          resources: data.resources, // Add resources
-          objectsCount: data.objectsCount, // Add objectsCount
+          model: data.model,
+          resources: data.resources,
+          objectsCount: data.objectsCount,
         }),
       });
 
@@ -245,14 +287,33 @@ export default function JSONGenerator({ id }: FormProps) {
       if (result.error) throw new Error(result.error);
 
       setGeneratedData(result.message);
-      await reduceJsonCount({ clerkId: user?.user?.id! });
-      toast.success("JSON data generated successfully");
+      toast.success("JSON data generated successfully (fallback mode)");
+    } catch (error: any) {
+      throw error;
+    }
+  };
+
+  const onSubmit = async (data: FormValues) => {
+    setIsLoading(true);
+    setError(null);
+    setGeneratedData([]);
+    setUseFallback(false);
+    startProgressiveLoading();
+
+    try {
+      if (useFallback) {
+        await generateWithFallback(data);
+        setIsLoading(false);
+        stopProgressiveLoading();
+      } else {
+        await generateWithConvex(data);
+        // Don't set isLoading false here - wait for job completion
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to generate data";
       setError(errorMessage);
       toast.error(errorMessage);
-    } finally {
       setIsLoading(false);
       stopProgressiveLoading();
     }
@@ -269,10 +330,13 @@ export default function JSONGenerator({ id }: FormProps) {
     setGeneratedData([]);
     setSelectedOption(null);
     setError(null);
+    setCurrentJobId(null);
+    setUseFallback(false);
   };
 
   const handleRetry = () => {
     setError(null);
+    setUseFallback(true); // Use fallback on retry
     onSubmit(getValues());
   };
 
@@ -303,6 +367,7 @@ export default function JSONGenerator({ id }: FormProps) {
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
+                        disabled={isLoading || isSaving}
                       >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select a model" />
@@ -343,6 +408,7 @@ export default function JSONGenerator({ id }: FormProps) {
                           setSelectedOption(value);
                         }}
                         value={field.value}
+                        disabled={isLoading || isSaving}
                       >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select resource type" />
@@ -374,6 +440,7 @@ export default function JSONGenerator({ id }: FormProps) {
                         {...field}
                         placeholder="Enter resource name"
                         className="w-full"
+                        disabled={isLoading || isSaving}
                       />
                     )}
                   />
@@ -399,6 +466,7 @@ export default function JSONGenerator({ id }: FormProps) {
                           field.onChange(parseInt(e.target.value, 10))
                         }
                         className="w-full"
+                        disabled={isLoading || isSaving}
                       />
                     )}
                   />
@@ -433,7 +501,7 @@ export default function JSONGenerator({ id }: FormProps) {
               )}
 
               <div className="flex gap-2">
-                <Button type="submit" disabled={isLoading}>
+                <Button type="submit" disabled={isLoading || isSaving}>
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -447,7 +515,7 @@ export default function JSONGenerator({ id }: FormProps) {
                   type="button"
                   variant="outline"
                   onClick={handleReset}
-                  disabled={isLoading}
+                  disabled={isLoading || isSaving}
                 >
                   Reset
                 </Button>
@@ -473,6 +541,23 @@ export default function JSONGenerator({ id }: FormProps) {
                 )}
               </div>
             </form>
+
+            {/* Job Status Indicator */}
+            {job && (
+              <div className="mt-4 text-sm text-gray-600 p-3 bg-blue-50 rounded-md">
+                <p className="font-medium">
+                  Status: <span className="capitalize">{job.status}</span>
+                </p>
+                {job.model && (
+                  <p className="text-xs mt-1">Model: {job.model}</p>
+                )}
+                {job.processingTime && (
+                  <p className="text-xs mt-1">
+                    Processed in {(job.processingTime / 1000).toFixed(2)}s
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -496,7 +581,7 @@ export default function JSONGenerator({ id }: FormProps) {
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                   <Button onClick={handleRetry} variant="outline">
-                    Retry Generation
+                    Retry with Fallback API
                   </Button>
                 </div>
               ) : (
@@ -528,14 +613,9 @@ export default function JSONGenerator({ id }: FormProps) {
                         <p>Generated JSON data will appear here...</p>
                       </div>
                     ) : (
-                      generatedData.map((data, index) => (
-                        <pre
-                          key={index}
-                          className="whitespace-pre-wrap break-words text-sm"
-                        >
-                          {JSON.stringify(data, null, 2)}
-                        </pre>
-                      ))
+                      <pre className="whitespace-pre-wrap break-words text-sm">
+                        {JSON.stringify(generatedData, null, 2)}
+                      </pre>
                     )}
                   </div>
                 </>

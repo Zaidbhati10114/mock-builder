@@ -1,11 +1,5 @@
 "use client";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,21 +8,18 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Row } from "@/components/ui/row";
-import { Copy, RefreshCw, Terminal } from "lucide-react";
+import { Copy, RefreshCw } from "lucide-react";
 import { Loader } from "./Loader";
 import { toast as sonnerToast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/clerk-react";
 import { useIsSubscribed } from "@/lib/useUserLimitstore";
 import { ConvexError } from "convex/values";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
-
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Headsup from "./Headups";
-import { generateStructuredData } from "../actions/gemini";
+import { Id } from "@/convex/_generated/dataModel";
 
 interface FormProps {
   id: string;
@@ -36,7 +27,7 @@ interface FormProps {
 
 const schema = z.object({
   prompt: z.string().nonempty({ message: "Input Data is required" }),
-  resourceName: z.string().optional(), // keep optional
+  resourceName: z.string().optional(),
   objectsCount: z
     .number()
     .min(1, { message: "Objects count must be at least 1" })
@@ -53,35 +44,42 @@ const EASY_SELECTIONS = [
   { websiteTitle: "5 most popular social media networks" },
 ] as const;
 
-// Progressive loading messages
 const LOADING_MESSAGES = [
-  { time: 0, message: "Generating..." },
-  { time: 4000, message: "Please wait, it's loading..." },
-  { time: 8000, message: "AI model is busy, processing your request..." },
-  { time: 12000, message: "Complex request detected, still working..." },
-  { time: 16000, message: "Almost there, finalizing the data..." },
-  { time: 20000, message: "Thank you for your patience, processing..." },
-  { time: 25000, message: "High server load detected, please wait..." },
-  { time: 30000, message: "Request is taking longer than expected..." },
+  { time: 0, message: "Queuing your request..." },
+  { time: 2000, message: "AI is processing..." },
+  { time: 5000, message: "Generating data..." },
+  { time: 10000, message: "Almost there..." },
+  { time: 15000, message: "Finalizing results..." },
 ];
 
 export default function JsonGeneratorForm({ id }: FormProps) {
   const user = useUser();
   const { MAX_RESOURCES, user: userDetails } = useIsSubscribed();
   const router = useRouter();
-  const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
+
   const [jsonData, setJsonData] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditable, setIsEditable] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("Generating...");
+  const [currentJobId, setCurrentJobId] = useState<Id<"jsonJobs"> | null>(null);
+  const [useFallback, setUseFallback] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const messageIndexRef = useRef(0);
 
+  // Convex hooks
   const createResource = useMutation(api.resources.createResource);
-  const reduceJsonCount = useMutation(api.resources.reduceJsonGenerationCount);
+  const createJob = useMutation(api.jsonJobs.createJob);
+  const generateJsonAction = useAction(api.jsonActions.generateJsonData);
+
+  // Subscribe to job updates (real-time!)
+  const job = useQuery(
+    api.jsonJobs.getJob,
+    currentJobId ? { jobId: currentJobId } : "skip"
+  );
 
   const {
     register,
@@ -101,7 +99,42 @@ export default function JsonGeneratorForm({ id }: FormProps) {
 
   const resourceName = watch("resourceName");
 
-  // Function to start progressive loading messages
+  // Handle job status changes (real-time updates!)
+  useEffect(() => {
+    if (!job) return;
+
+    switch (job.status) {
+      case "queued":
+        setLoadingMessage("Request queued, starting soon...");
+        break;
+      case "processing":
+        setLoadingMessage("AI is generating your data...");
+        break;
+      case "completed":
+        if (job.result) {
+          setJsonData(job.result);
+          setIsEditable(true);
+          setIsGenerating(false);
+          stopProgressiveLoading();
+          sonnerToast.success(
+            `Generated ${job.result.length} items successfully!`
+          );
+        }
+        break;
+      case "failed":
+        setIsGenerating(false);
+        stopProgressiveLoading();
+        toast({
+          variant: "destructive",
+          title: "Generation Failed",
+          description: job.error || "An error occurred",
+        });
+        // Offer to use fallback
+        setUseFallback(true);
+        break;
+    }
+  }, [job]);
+
   const startProgressiveLoading = useCallback(() => {
     messageIndexRef.current = 0;
     setLoadingMessage(LOADING_MESSAGES[0].message);
@@ -112,7 +145,6 @@ export default function JsonGeneratorForm({ id }: FormProps) {
         const nextMessage = LOADING_MESSAGES[messageIndexRef.current];
         setLoadingMessage(nextMessage.message);
 
-        // Calculate time until next message
         const currentTime =
           LOADING_MESSAGES[messageIndexRef.current - 1]?.time || 0;
         const nextTime = nextMessage.time;
@@ -122,14 +154,12 @@ export default function JsonGeneratorForm({ id }: FormProps) {
       }
     };
 
-    // Start the first timer (4 seconds for the second message)
     loadingTimerRef.current = setTimeout(
       updateMessage,
       LOADING_MESSAGES[1].time
     );
   }, []);
 
-  // Function to stop progressive loading messages
   const stopProgressiveLoading = useCallback(() => {
     if (loadingTimerRef.current) {
       clearTimeout(loadingTimerRef.current);
@@ -153,15 +183,15 @@ export default function JsonGeneratorForm({ id }: FormProps) {
       } else {
         toast({
           variant: "destructive",
-          title: "Uh oh! Something went wrong.",
-          description: "There was a problem with your request.",
+          title: "Invalid structure",
+          description: "Each item must have id, title, and description",
         });
       }
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description: "Invalid JSON format.",
+        title: "Invalid JSON",
+        description: "Please check your JSON syntax",
       });
     }
   };
@@ -172,8 +202,8 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     if (!name) {
       toast({
         variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description: "Resource Name is required to save the data",
+        title: "Resource Name Required",
+        description: "Please enter a resource name to save",
       });
       return;
     }
@@ -181,8 +211,8 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     if (!jsonData || (Array.isArray(jsonData) && jsonData.length === 0)) {
       toast({
         variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description: "No Data to save",
+        title: "No Data",
+        description: "Generate data first before saving",
       });
       return;
     }
@@ -190,8 +220,8 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     if (userDetails?.resourceCount! >= MAX_RESOURCES) {
       toast({
         variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description: "You have reached the maximum number of resources",
+        title: "Limit Reached",
+        description: `You've reached the maximum of ${MAX_RESOURCES} resources`,
       });
       return;
     }
@@ -204,7 +234,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
         data: jsonData,
       });
       router.push(`/dashboard/projects/${id}/resources`);
-      sonnerToast.success("Data saved successfully");
+      sonnerToast.success("Data saved successfully!");
     } catch (error) {
       const errorMessage =
         error instanceof ConvexError
@@ -212,7 +242,7 @@ export default function JsonGeneratorForm({ id }: FormProps) {
           : "Failed to save data";
       toast({
         variant: "destructive",
-        title: "Uh oh! Something went wrong.",
+        title: "Save Failed",
         description: errorMessage,
       });
     } finally {
@@ -220,165 +250,91 @@ export default function JsonGeneratorForm({ id }: FormProps) {
     }
   };
 
-  // Updated onSubmit function with better error handling
-  // const onSubmit: SubmitHandler<FormData> = useCallback(
-  //   async (data) => {
-  //     if (data.objectsCount > 1) {
-  //       setJsonData(null);
-  //     }
-  //     setIsGenerating(true);
-  //     setIsEditable(false);
-  //     startProgressiveLoading();
+  // Main generation function using Convex Actions
+  const generateWithConvex = async (data: FormData) => {
+    try {
+      // Create job
+      const jobId = await createJob({
+        projectId: id,
+        prompt: data.prompt,
+        objectsCount: data.objectsCount,
+      });
 
-  //     try {
-  //       console.log("Submitting form with data:", data);
+      setCurrentJobId(jobId);
 
-  //       // Call the server action
-  //       const result = await generateStructuredData({
-  //         prompt: data.prompt,
-  //         objectsCount: data.objectsCount,
-  //       });
+      // Trigger background action
+      generateJsonAction({
+        jobId,
+        prompt: data.prompt,
+        objectsCount: data.objectsCount,
+        userId: userDetails!._id,
+      }).catch((error) => {
+        console.error("Action error:", error);
+      });
+    } catch (error: any) {
+      throw error;
+    }
+  };
 
-  //       console.log("Server action result:", result);
+  // Fallback to API route
+  const generateWithFallback = async (data: FormData) => {
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: data.prompt,
+          objectsCount: data.objectsCount,
+        }),
+      });
 
-  //       // Check if result exists and has the expected structure
-  //       if (!result) {
-  //         throw new Error("No response received from server");
-  //       }
+      const result = await response.json();
 
-  //       if (result.status === "error") {
-  //         throw new Error(result.error || "Server returned an error");
-  //       }
+      if (!response.ok || result.status === "error") {
+        throw new Error(result.error || "Server error");
+      }
 
-  //       if (result.status === "success" && result.data) {
-  //         setJsonData(result.data);
-  //         setIsEditable(true);
-  //         sonnerToast.success(
-  //           result.error || "JSON data generated successfully"
-  //         );
-
-  //         // Reduce the user's JSON count
-  //         if (user?.user?.id) {
-  //           try {
-  //             await reduceJsonCount({ clerkId: user.user.id });
-  //           } catch (countError) {
-  //             console.warn("Failed to reduce JSON count:", countError);
-  //             // Don't fail the entire operation for this
-  //           }
-  //         }
-  //       } else {
-  //         throw new Error("Invalid response format from server");
-  //       }
-  //     } catch (error: any) {
-  //       console.error("Form submission error:", error);
-
-  //       let errorMessage = "Failed to generate JSON";
-
-  //       if (error.message) {
-  //         errorMessage = error.message;
-  //       } else if (typeof error === "string") {
-  //         errorMessage = error;
-  //       }
-
-  //       toast({
-  //         variant: "destructive",
-  //         title: "Generation Failed",
-  //         description: errorMessage,
-  //       });
-
-  //       setJsonData(null);
-  //     } finally {
-  //       setIsGenerating(false);
-  //       stopProgressiveLoading();
-  //     }
-  //   },
-  //   [
-  //     reduceJsonCount,
-  //     toast,
-  //     user?.user?.id,
-  //     startProgressiveLoading,
-  //     stopProgressiveLoading,
-  //   ]
-  // );
-  // Replace your onSubmit function with this:
+      if (result.status === "success" && result.data) {
+        setJsonData(result.data);
+        setIsEditable(true);
+        sonnerToast.success("JSON generated successfully (fallback mode)");
+      } else {
+        throw new Error("Invalid response");
+      }
+    } catch (error: any) {
+      throw error;
+    }
+  };
 
   const onSubmit: SubmitHandler<FormData> = useCallback(
     async (data) => {
-      if (data.objectsCount > 1) {
-        setJsonData(null);
-      }
+      setJsonData(null);
       setIsGenerating(true);
       setIsEditable(false);
+      setUseFallback(false);
       startProgressiveLoading();
 
       try {
-        console.log("Submitting form with data:", data);
-
-        // Call the API route instead of server action
-        const response = await fetch("/api/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            prompt: data.prompt,
-            objectsCount: data.objectsCount,
-          }),
-        });
-
-        const result = await response.json();
-        console.log("API response:", result);
-
-        if (!response.ok || result.status === "error") {
-          throw new Error(result.error || "Server returned an error");
-        }
-
-        if (result.status === "success" && result.data) {
-          setJsonData(result.data);
-          setIsEditable(true);
-          sonnerToast.success("JSON data generated successfully");
-
-          // Reduce the user's JSON count
-          if (user?.user?.id) {
-            try {
-              await reduceJsonCount({ clerkId: user.user.id });
-            } catch (countError) {
-              console.warn("Failed to reduce JSON count:", countError);
-            }
-          }
+        if (useFallback) {
+          await generateWithFallback(data);
         } else {
-          throw new Error("Invalid response format from server");
+          await generateWithConvex(data);
         }
       } catch (error: any) {
-        console.error("Form submission error:", error);
-
-        let errorMessage = "Failed to generate JSON";
-
-        if (error.message) {
-          errorMessage = error.message;
-        } else if (typeof error === "string") {
-          errorMessage = error;
-        }
+        console.error("Generation error:", error);
+        setIsGenerating(false);
+        stopProgressiveLoading();
 
         toast({
           variant: "destructive",
           title: "Generation Failed",
-          description: errorMessage,
+          description: error.message || "Failed to generate JSON",
         });
-
-        setJsonData(null);
-      } finally {
-        setIsGenerating(false);
-        stopProgressiveLoading();
       }
     },
-    [
-      reduceJsonCount,
-      toast,
-      user?.user?.id,
-      startProgressiveLoading,
-      stopProgressiveLoading,
-    ]
+    [useFallback, startProgressiveLoading, stopProgressiveLoading]
   );
 
   const handleClick = (title: string) => {
@@ -386,13 +342,12 @@ export default function JsonGeneratorForm({ id }: FormProps) {
   };
 
   const resetForm = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
     stopProgressiveLoading();
     reset();
     setJsonData(null);
     setIsEditable(false);
+    setCurrentJobId(null);
+    setUseFallback(false);
   };
 
   const copyToClipboard = () => {
@@ -404,147 +359,161 @@ export default function JsonGeneratorForm({ id }: FormProps) {
 
   useEffect(() => {
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
       stopProgressiveLoading();
     };
   }, [stopProgressiveLoading]);
 
   return (
-    <div className="flex flex-col md:flex-row space-y-8 md:space-y-0 md:space-x-6">
-      <div className="w-full md:w-1/2 p-3 py-4">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="space-y-4">
-            <Label htmlFor="prompt">Input Data</Label>
-            <Input
-              id="prompt"
-              {...register("prompt")}
-              placeholder="Enter what kind of JSON data you need"
-              className="mt-1 block w-full"
-              disabled={isGenerating || isSaving}
-            />
-            {errors.prompt && (
-              <p className="text-red-600 text-sm">{errors.prompt?.message}</p>
-            )}
+    <div className="bg-white rounded-xl border border-gray-200 p-6 md:p-8 shadow-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Left Column - Form */}
+        <div className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="prompt" className="text-sm font-medium">
+                Input Data
+              </Label>
+              <Input
+                id="prompt"
+                {...register("prompt")}
+                placeholder="Enter what kind of JSON data you need"
+                disabled={isGenerating || isSaving}
+              />
+              {errors.prompt && (
+                <p className="text-red-600 text-xs">{errors.prompt?.message}</p>
+              )}
+            </div>
 
-            <Label htmlFor="resourceName">Resource Name</Label>
-            <Input
-              id="resourceName"
-              {...register("resourceName")}
-              placeholder="Enter resource name"
-              className="mt-1 block w-full"
-              disabled={isGenerating || isSaving}
-            />
-            {/* {errors.resourceName && (
-              <p className="text-red-600 text-sm">
-                {errors.resourceName.message}
-              </p>
-            )} */}
+            <div className="space-y-2">
+              <Label htmlFor="resourceName" className="text-sm font-medium">
+                Resource Name
+              </Label>
+              <Input
+                id="resourceName"
+                {...register("resourceName")}
+                placeholder="Enter resource name"
+                disabled={isGenerating || isSaving}
+              />
+            </div>
 
-            <Row className="flex-wrap gap-2 justify-start items-center my-2 w-full">
+            <div className="flex flex-wrap gap-2">
               {EASY_SELECTIONS.map((item) => (
                 <Button
                   key={item.websiteTitle}
-                  className="whitespace-nowrap"
+                  className="text-xs"
                   size="sm"
                   onClick={() => handleClick(item.websiteTitle)}
                   variant="outline"
                   disabled={isGenerating || isSaving}
+                  type="button"
                 >
                   {item.websiteTitle}
                 </Button>
               ))}
-            </Row>
+            </div>
+          </form>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-2 pt-4 border-t">
+            <Button
+              onClick={handleSubmit(onSubmit)}
+              disabled={isGenerating || isSaving}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isGenerating && (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {isGenerating ? "Generating..." : "Generate"}
+            </Button>
+
+            <Button
+              onClick={validateAndSaveData}
+              disabled={
+                isGenerating ||
+                isSaving ||
+                !jsonData ||
+                !validateJsonStructure(jsonData)
+              }
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={resetForm}
+              type="button"
+              disabled={isGenerating || isSaving}
+            >
+              Reset
+            </Button>
           </div>
-        </form>
 
-        {/* Save button moved outside the form */}
-        <div className="flex space-x-2 mt-6">
-          <Button
-            onClick={handleSubmit(onSubmit)}
-            variant="secondary"
-            disabled={isGenerating || isSaving}
-          >
-            {isGenerating && (
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            {isGenerating ? "Generating..." : "Generate"}
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={validateAndSaveData}
-            disabled={
-              isGenerating ||
-              isSaving ||
-              !jsonData ||
-              !validateJsonStructure(jsonData)
-            }
-          >
-            {isSaving ? "Saving..." : "Save"}
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={resetForm}
-            type="button"
-            disabled={isGenerating || isSaving}
-          >
-            Reset
-          </Button>
-        </div>
-        <div className="space-y-2 mt-4">
           <Headsup />
-        </div>
-      </div>
 
-      <div className="w-full md:w-1/2 relative">
-        <Label htmlFor="jsonOutput">Generated JSON</Label>
-        <div className="relative mt-2">
-          <Textarea
-            ref={textareaRef}
-            className="font-mono h-[70vh] resize-none overflow-y-auto scrollbar-hide"
-            id="jsonOutput"
-            value={jsonData ? JSON.stringify(jsonData, null, 2) : ""}
-            onChange={handleJsonChange}
-            readOnly={!isEditable}
-            placeholder={
-              isGenerating
-                ? loadingMessage
-                : jsonData
-                  ? "Generated JSON will appear here"
-                  : "No data generated yet"
-            }
-          />
-          {(isGenerating || isSaving) && (
-            <div className="absolute inset-0 flex items-center justify-center bg-opacity-75">
-              <div className="flex flex-col items-center space-y-3">
-                <Loader />
-                {isGenerating && (
-                  <p className="text-sm text-gray-600 text-center px-4 animate-pulse">
-                    {loadingMessage}
-                  </p>
-                )}
-              </div>
+          {/* Job Status Indicator */}
+          {job && (
+            <div className="text-sm text-gray-600 p-3 bg-blue-50 rounded-md">
+              <p className="font-medium">Status: {job.status}</p>
+              {job.processingTime && (
+                <p className="text-xs mt-1">
+                  Processed in {(job.processingTime / 1000).toFixed(2)}s
+                </p>
+              )}
             </div>
           )}
         </div>
 
-        <div className="absolute top-0 right-0 flex items-center space-x-2 mb-2 mr-1">
-          <div className="bg-gray-200 text-gray-800 text-xs font-medium px-2 py-1 rounded">
-            {Array.isArray(jsonData) ? jsonData.length : 0} items
+        {/* Right Column - JSON Output */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="jsonOutput" className="text-sm font-medium">
+              Generated JSON
+            </Label>
+            <div className="flex items-center gap-2">
+              <div className="bg-gray-100 text-gray-700 text-xs font-medium px-2 py-1 rounded">
+                {Array.isArray(jsonData) ? jsonData.length : 0} items
+              </div>
+              <Button
+                onClick={copyToClipboard}
+                variant="outline"
+                size="sm"
+                className="h-7"
+                title="Copy JSON"
+                disabled={!jsonData || isGenerating || isSaving}
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
-          <Button
-            onClick={copyToClipboard}
-            variant="secondary"
-            size="icon"
-            className="h-6 w-6"
-            title="Copy JSON"
-            disabled={!jsonData || isGenerating || isSaving}
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
+
+          <div className="relative">
+            <Textarea
+              ref={textareaRef}
+              className="font-mono h-[500px] resize-none overflow-y-auto"
+              id="jsonOutput"
+              value={jsonData ? JSON.stringify(jsonData, null, 2) : ""}
+              onChange={handleJsonChange}
+              readOnly={!isEditable}
+              placeholder={
+                isGenerating
+                  ? loadingMessage
+                  : "Generated JSON will appear here..."
+              }
+            />
+            {(isGenerating || isSaving) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/90">
+                <div className="flex flex-col items-center space-y-3">
+                  <Loader />
+                  {isGenerating && (
+                    <p className="text-sm text-gray-600 text-center px-4 animate-pulse">
+                      {loadingMessage}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -14,7 +14,12 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as advancedJsonActions from "../advancedJsonActions.js";
+import type * as advancedJsonJobs from "../advancedJsonJobs.js";
 import type * as http from "../http.js";
+import type * as jsonActions from "../jsonActions.js";
+import type * as jsonJobs from "../jsonJobs.js";
+import type * as multiModelActions from "../multiModelActions.js";
 import type * as projects from "../projects.js";
 import type * as resources from "../resources.js";
 import type * as stripe from "../stripe.js";
@@ -30,7 +35,12 @@ import type * as users from "../users.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  advancedJsonActions: typeof advancedJsonActions;
+  advancedJsonJobs: typeof advancedJsonJobs;
   http: typeof http;
+  jsonActions: typeof jsonActions;
+  jsonJobs: typeof jsonJobs;
+  multiModelActions: typeof multiModelActions;
   projects: typeof projects;
   resources: typeof resources;
   stripe: typeof stripe;
